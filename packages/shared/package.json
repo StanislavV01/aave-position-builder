@@ -1,0 +1,19 @@
+{
+  "name": "@app/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bgd-labs/aave-address-book": "4.44.22",
+    "viem": "^2.55.10",
+    "zod": "^4.4.3"
+  }
+}
