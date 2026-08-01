@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { decodeFunctionResult, encodeFunctionData } from 'viem'
-import { POOL_ABI, UI_POOL_DATA_PROVIDER_ABI, getEModesAbi, marketByNetworkKey } from '@app/shared'
+import { POOL_ABI, UI_POOL_DATA_PROVIDER_ABI, getEModesAbi, getReservesDataAbi, marketByNetworkKey } from '@app/shared'
 
 const market = marketByNetworkKey('base-sepolia')
 const RPC = 'http://localhost:8787/rpc/base-sepolia'
@@ -28,7 +28,7 @@ const blockHex = await rpc('eth_blockNumber', [])
 
 const reservesDataHex = await call(
   market.uiPoolDataProvider,
-  encodeFunctionData({ abi: UI_POOL_DATA_PROVIDER_ABI, functionName: 'getReservesData', args: [market.poolAddressesProvider] }),
+  encodeFunctionData({ abi: getReservesDataAbi(market.networkKey), functionName: 'getReservesData', args: [market.poolAddressesProvider] }),
 )
 const eModesHex = await call(
   market.uiPoolDataProvider,
