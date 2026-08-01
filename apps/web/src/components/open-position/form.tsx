@@ -7,7 +7,7 @@ import { useOpenPositionPlan } from '../../lib/open-position/plan'
 import { useOpenPosition } from '../../lib/open-position/execute'
 import { shouldMountExecutePanel, visiblePlanReasons } from '../../lib/ui/execute-view'
 import { HfGauge } from '../position/hf-gauge'
-import { formatTokenAmount } from '../../lib/format'
+import { formatTokenAmount, trimAmountText } from '../../lib/format'
 
 const DEFAULT_TARGET_HF = 2n * 10n ** 18n
 
@@ -68,7 +68,7 @@ export function OpenPositionForm({
   if (isLoading || !collateralView || !borrowView) return <p className="muted">Loading market data…</p>
 
   const borrowDisplay =
-    lastEdited === 'targetHf' && plan?.borrow ? formatUnits(plan.borrow.amount, borrowView.decimals) : borrowText
+    lastEdited === 'targetHf' && plan?.borrow ? trimAmountText(formatUnits(plan.borrow.amount, borrowView.decimals)) : borrowText
   const sliderValueWad =
     lastEdited === 'borrowAmount' && plan?.predictedHfWad ? plan.predictedHfWad : targetHfWad
   const reasons = plan ? visiblePlanReasons(plan.reasons, amountText !== '' || borrowText !== '') : []
@@ -83,6 +83,8 @@ export function OpenPositionForm({
         <input
           id="collateral-amount" type="text" inputMode="decimal" placeholder="0.0"
           value={amountText} onChange={(e) => setAmountText(e.target.value)}
+          aria-invalid={reasons.length > 0 || undefined}
+          aria-describedby={reasons.length > 0 ? 'plan-errors' : undefined}
         />
         <div className="chips">
           {[25n, 50n, 75n].map((pct) => (
@@ -109,6 +111,10 @@ export function OpenPositionForm({
             Enable eMode “{plan.eModeCandidate.label}” — LTV {Number(collateralView.ltvBps) / 100}% →{' '}
             {Number(plan.eModeCandidate.ltvBps) / 100}%
           </label>
+          <span className="reason">
+            Efficiency mode: higher borrowing power for correlated assets. It also changes the liquidation
+            threshold for this category.
+          </span>
         </div>
       ) : null}
 
@@ -126,6 +132,8 @@ export function OpenPositionForm({
           id="borrow-amount" type="text" inputMode="decimal" placeholder="0.0"
           value={borrowDisplay}
           onChange={(e) => { setLastEdited('borrowAmount'); setBorrowText(e.target.value) }}
+          aria-invalid={reasons.length > 0 || undefined}
+          aria-describedby={reasons.length > 0 ? 'plan-errors' : undefined}
         />
       </div>
 
@@ -140,15 +148,17 @@ export function OpenPositionForm({
               ? ` (limited by ${plan.bindingConstraint === 'ltv' ? 'LTV borrowing power' : 'available liquidity'})`
               : ''}
           </p>
-          {plan.capped ? <p className="reason">Requested amount was capped to the maximum.</p> : null}
+          {plan.capped ? <p className="reason" role="status">Requested amount was capped to the maximum.</p> : null}
           {plan.warnLowHf ? (
-            <p className="reason">Warning: below HF 1.1 a small price move can liquidate this position.</p>
+            <p className="tone-chip" data-tone="warn" role="status">
+              Warning: below HF 1.1 a small price move can liquidate this position.
+            </p>
           ) : null}
         </div>
       ) : null}
 
       {reasons.length > 0 ? (
-        <div className="error-card">
+        <div className="error-card" id="plan-errors" aria-live="polite">
           <ul>
             {reasons.map((r) => (
               <li key={r}>{r}</li>

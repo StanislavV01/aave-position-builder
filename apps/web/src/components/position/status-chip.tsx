@@ -1,18 +1,32 @@
+import { useEffect, useReducer } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useConfig } from 'wagmi'
 import { readContract } from 'wagmi/actions'
 import { POOL_ABI, marketByChainId } from '@app/shared'
 
-export type ChipStatus = 'live' | 'degraded' | 'disconnected'
+export type ChipStatus = 'live' | 'degraded' | 'disconnected' | 'connecting'
 
-const STATUS_TONE = { live: 'good', degraded: 'warn', disconnected: 'danger' } as const
+const STATUS_TONE = { live: 'good', degraded: 'warn', disconnected: 'danger', connecting: 'neutral' } as const
+const STATUS_LABEL: Record<ChipStatus, string> = {
+  live: 'Live',
+  degraded: 'Degraded — polling every 5s',
+  disconnected: 'Disconnected — polling every 5s',
+  connecting: 'Connecting…',
+}
 
 export function StatusChip({ status, lastEventAtMs }: { status: ChipStatus; lastEventAtMs: number | null }) {
-  const label =
-    status === 'live' ? 'Live' : status === 'degraded' ? 'Degraded — polling every 5s' : 'Disconnected — polling every 5s'
+  // The "Xs ago" figure must tick on its own — computed at render only, it froze
+  // until an unrelated re-render, undermining the freshness claim it exists to make.
+  const [, tick] = useReducer((n: number) => n + 1, 0)
+  useEffect(() => {
+    if (lastEventAtMs === null) return
+    const id = setInterval(tick, 1_000)
+    return () => clearInterval(id)
+  }, [lastEventAtMs])
+
   return (
-    <span className="status-chip" data-tone={STATUS_TONE[status]}>
-      {label}
+    <span className="status-chip" data-tone={STATUS_TONE[status]} role="status">
+      {STATUS_LABEL[status]}
       {lastEventAtMs !== null ? (
         <span className="muted tabular">· last event {Math.max(0, Math.round((Date.now() - lastEventAtMs) / 1000))}s ago</span>
       ) : null}

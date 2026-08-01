@@ -77,8 +77,17 @@ export function ExecutePanel({
           {busy ? 'Working…' : label}
         </button>
       ) : null}
-      <TxProgress state={state} permitPath={permit !== null} />
-      {notice ? <p className="notice">{notice}</p> : null}
+      {/* The live region must exist BEFORE content changes inside it, or screen readers
+          skip the first announcements — so the wrapper is always mounted and TxProgress
+          mounts/unmounts within it (its <ol>s no longer carry their own aria-live). */}
+      <div aria-live="polite">
+        <TxProgress state={state} permitPath={permit !== null} />
+      </div>
+      {notice ? (
+        <p className="notice" role="status">
+          {notice}
+        </p>
+      ) : null}
       {state.phase === 'error' ? (
         <div className="error-card" role="alert" tabIndex={-1}>
           <p>{state.message}</p>
@@ -103,7 +112,7 @@ export function ExecutePanel({
         </div>
       ) : null}
       {state.phase === 'confirmed' ? (
-        <p className="notice">
+        <p className="notice" role="status">
           Position opened in block <span className="tabular">{state.blockNumber.toString()}</span> —{' '}
           <a href={`${explorer}/tx/${state.txHash}`} target="_blank" rel="noreferrer">
             view on Basescan

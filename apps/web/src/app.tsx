@@ -70,6 +70,9 @@ export function App() {
 
   return (
     <div className="layout">
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
       <header className="topbar">
         <h1>Aave V3 Position Builder</h1>
         <ThemeToggle />
@@ -83,7 +86,7 @@ export function App() {
           </span>
         ) : null}
       </header>
-      <main className="panes">
+      <main id="main" className="panes">
         <section className="card">
           <h2>Market</h2>
           {marketState === 'error' ? (

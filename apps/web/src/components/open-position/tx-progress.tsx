@@ -14,7 +14,7 @@ export function TxProgress({ state, permitPath }: { state: OpenFlowState; permit
   if (state.phase === 'idle') return null
   if (state.phase === 'fallback-sequential') {
     return (
-      <ol className="steps" aria-live="polite">
+      <ol className="steps">
         {Array.from({ length: state.totalSteps }, (_, i) => {
           const n = i + 1
           const tone: StepTone = n < state.step ? 'done' : n === state.step ? 'active' : 'idle'
@@ -45,7 +45,7 @@ export function TxProgress({ state, permitPath }: { state: OpenFlowState; permit
     state.phase === 'pending' ? `Waiting for block — ${state.txHash.slice(0, 10)}…` : 'Mined',
   ]
   return (
-    <ol className="steps" aria-live="polite">
+    <ol className="steps">
       {order.map((key, i) => {
         const tone: StepTone =
           state.phase === 'error'

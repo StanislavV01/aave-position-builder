@@ -8,6 +8,7 @@ import {
   hfGaugePercent,
   hfWadToNumber,
   numberToHfWad,
+  trimAmountText,
 } from './format'
 
 const MAX_UINT256 = (1n << 256n) - 1n
@@ -97,5 +98,22 @@ describe('hfGaugePercent', () => {
     expect(hfGaugePercent(3n * WAD)).toBe(100)
     expect(hfGaugePercent(1000n * WAD)).toBe(100)
     expect(hfGaugePercent(MAX_UINT256)).toBe(100)
+  })
+})
+
+describe('trimAmountText', () => {
+  it('truncates long fraction tails without rounding up', () => {
+    expect(trimAmountText('123.456789012345678901')).toBe('123.45678901')
+    expect(trimAmountText('0.999999999999999999')).toBe('0.99999999')
+  })
+
+  it('leaves short and integer inputs untouched', () => {
+    expect(trimAmountText('42')).toBe('42')
+    expect(trimAmountText('1.5')).toBe('1.5')
+  })
+
+  it('drops a trailing dot and zero tails', () => {
+    expect(trimAmountText('7.000000000')).toBe('7')
+    expect(trimAmountText('0.000000000')).toBe('0')
   })
 })

@@ -61,6 +61,18 @@ export function hfGaugePercent(hfWad: bigint): number {
   return Number(((hfWad - min) * 10_000n) / (max - min)) / 100
 }
 
+/**
+ * Trim a decimal string for display in an editable field (e.g. the auto-sized borrow
+ * amount, which formatUnits renders with up to 18 fraction digits). Truncates — never
+ * rounds up — so the shown value is always executable.
+ */
+export function trimAmountText(text: string, maxFrac = 8): string {
+  const dot = text.indexOf('.')
+  if (dot === -1) return text
+  const trimmed = text.slice(0, dot + 1 + maxFrac).replace(/\.?0+$/, '')
+  return trimmed === '' ? '0' : trimmed
+}
+
 /** Slider edge conversions — resolution 0.01, safe well inside double precision. */
 export function hfWadToNumber(hfWad: bigint): number {
   return Number(hfWad / 10n ** 16n) / 100

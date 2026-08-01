@@ -92,6 +92,12 @@ button { font: inherit; }
 .tabular { font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-muted); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.skip-link {
+  position: absolute; left: var(--space-4); top: -100px; z-index: 10;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); padding: var(--space-2) var(--space-3);
+}
+.skip-link:focus-visible { top: var(--space-2); }
 @media (prefers-reduced-motion: no-preference) {
   button, a, input, .select, .asset-row, .chip, .token-icon {
     transition: border-color var(--transition), background-color var(--transition),

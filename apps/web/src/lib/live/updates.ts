@@ -5,7 +5,8 @@ import type { NetworkKey } from '@app/shared'
 import { LiveClient, type LiveStatus } from './ws-client'
 
 export interface LiveUpdatesResult {
-  status: LiveStatus
+  /** 'connecting' only before the first status frame — a fresh page load is not a failure. */
+  status: LiveStatus | 'connecting'
   lastEventAtMs: number | null
   /** false while live; 5000 when degraded/disconnected — thread into refetchInterval. */
   pollMs: number | false
@@ -13,7 +14,7 @@ export interface LiveUpdatesResult {
 
 export function useLiveUpdates(networkKey: NetworkKey, address: Address | undefined): LiveUpdatesResult {
   const queryClient = useQueryClient()
-  const [status, setStatus] = useState<LiveStatus>('disconnected')
+  const [status, setStatus] = useState<LiveStatus | 'connecting'>('connecting')
   const [lastEventAtMs, setLastEventAtMs] = useState<number | null>(null)
   const clientRef = useRef<LiveClient | null>(null)
   const addressRef = useRef(address)
@@ -45,5 +46,7 @@ export function useLiveUpdates(networkKey: NetworkKey, address: Address | undefi
     if (address !== undefined) clientRef.current?.watch(networkKey, address)
   }, [networkKey, address])
 
-  return { status, lastEventAtMs, pollMs: status === 'live' ? false : 5_000 }
+  // No polling while 'connecting': it lasts a moment on load, and bursting the proxy
+  // before the socket settles would be noise, not resilience.
+  return { status, lastEventAtMs, pollMs: status === 'live' || status === 'connecting' ? false : 5_000 }
 }

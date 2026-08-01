@@ -42,8 +42,8 @@ function AssetRow({
 export function MarketPanel({ assets, selectedSupply, selectedBorrow, onSelectSupply, onSelectBorrow }: MarketPanelProps) {
   return (
     <div>
-      <h3 className="muted">Supply as collateral</h3>
-      <ul className="asset-list">
+      <h3 id="supply-list-heading">Supply as collateral</h3>
+      <ul className="asset-list" aria-labelledby="supply-list-heading">
         {assets.map((a) => (
           <AssetRow
             key={`s-${a.asset}`}
@@ -57,8 +57,8 @@ export function MarketPanel({ assets, selectedSupply, selectedBorrow, onSelectSu
           />
         ))}
       </ul>
-      <h3 className="muted">Borrow</h3>
-      <ul className="asset-list">
+      <h3 id="borrow-list-heading">Borrow</h3>
+      <ul className="asset-list" aria-labelledby="borrow-list-heading">
         {assets.map((a) => (
           <AssetRow
             key={`b-${a.asset}`}
