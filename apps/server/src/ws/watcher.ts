@@ -8,7 +8,7 @@ import {
   type NetworkKey,
   type PositionEventName,
 } from '@app/shared'
-import type { Upstream } from '../upstream.js'
+import type { Upstream } from '../rpc/upstream.js'
 
 export type WatcherStatus = 'connecting' | 'live' | 'degraded' | 'stopped'
 

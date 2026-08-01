@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import type { NetworkKey } from '@app/shared'
-import type { Hub } from './ws/hub.js'
+import type { Hub } from '../ws/hub.js'
 
 export interface HealthOpts {
   hub: Hub

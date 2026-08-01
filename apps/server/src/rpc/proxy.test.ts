@@ -1,6 +1,6 @@
 import Fastify from 'fastify'
 import { describe, expect, it } from 'vitest'
-import { rpcProxyPlugin } from './rpc-proxy.js'
+import { rpcProxyPlugin } from './proxy.js'
 import { UpstreamError, type RpcResult, type Upstream } from './upstream.js'
 
 type StubUpstream = Upstream & { calls: { network: string; body: unknown }[] }

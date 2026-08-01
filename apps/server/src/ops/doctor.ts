@@ -1,7 +1,7 @@
 import type pino from 'pino'
 import { decodeFunctionResult, encodeFunctionData, type Hex } from 'viem'
 import { MARKETS } from '@app/shared'
-import type { Upstream } from './upstream.js'
+import type { Upstream } from '../rpc/upstream.js'
 
 // Selector is computed by viem from this fragment — never hand-copied.
 const POOL_REVISION_ABI = [

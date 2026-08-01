@@ -2,7 +2,7 @@ import pino from 'pino'
 import { describe, expect, it } from 'vitest'
 import { marketByNetworkKey } from '@app/shared'
 import { runDoctor } from './doctor.js'
-import { UpstreamError, type RpcResult, type Upstream } from './upstream.js'
+import { UpstreamError, type RpcResult, type Upstream } from '../rpc/upstream.js'
 
 function captureLogger() {
   const lines: { level: number; msg: string; [k: string]: unknown }[] = []

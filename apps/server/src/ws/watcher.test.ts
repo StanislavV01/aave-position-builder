@@ -9,7 +9,7 @@ import {
   POSITION_EVENT_TOPIC0S,
   POSITION_EVENTS,
 } from '@app/shared'
-import type { Upstream } from '../upstream.js'
+import type { Upstream } from '../rpc/upstream.js'
 import { NetworkWatcher, type PositionEvent, type PoolLogEvent, type WatcherStatus } from './watcher.js'
 
 const MARKET = marketByNetworkKey('base-sepolia')

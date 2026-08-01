@@ -28,7 +28,7 @@ flowchart LR
   SPA -- sign & broadcast --> Wallet --> Chain
 ```
 
-The DRPC key exists only inside the server process (`apps/server/src/upstream.ts`). The browser
+The DRPC key exists only inside the server process (`apps/server/src/rpc/upstream.ts`). The browser
 never talks to DRPC; transaction broadcast goes through the wallet's own provider.
 
 ## Setup (clean clone)

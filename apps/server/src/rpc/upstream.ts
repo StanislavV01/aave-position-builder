@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws'
 import type { NetworkKey } from '@app/shared'
-import type { Env } from './env.js'
+import type { Env } from '../config/env.js'
 
 export interface RpcResult {
   status: number

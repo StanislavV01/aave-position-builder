@@ -2,8 +2,8 @@ import Fastify from 'fastify'
 import { describe, expect, it } from 'vitest'
 import type { NetworkKey } from '@app/shared'
 import { healthPlugin } from './health.js'
-import type { Hub } from './ws/hub.js'
-import type { WatcherStatus } from './ws/watcher.js'
+import type { Hub } from '../ws/hub.js'
+import type { WatcherStatus } from '../ws/watcher.js'
 
 type NetStatus = { ws: WatcherStatus; lastBlockSeen: number | null; lastBlockAtMs: number | null }
 
