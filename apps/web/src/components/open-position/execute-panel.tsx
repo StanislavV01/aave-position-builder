@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { Address } from 'viem'
 import { marketByChainId } from '@app/shared'
-import type { OpenPositionPlan } from '../lib/plan'
-import { useOpenPosition, type ExecutablePlan } from '../lib/execute'
-import { usePermitSupport, useTokenState } from '../lib/token-queries'
-import { formatTokenAmount } from '../lib/format'
+import type { OpenPositionPlan } from '../../lib/plan'
+import { useOpenPosition, type ExecutablePlan } from '../../lib/execute'
+import { usePermitSupport, useTokenState } from '../../lib/token-queries'
+import { formatTokenAmount } from '../../lib/format'
 import { TxProgress } from './tx-progress'
 
 export function ExecutePanel({ plan, chainId, address }: { plan: OpenPositionPlan; chainId: number; address: Address }) {

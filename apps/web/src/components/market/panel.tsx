@@ -1,6 +1,6 @@
 import type { Address } from 'viem'
-import type { MarketAssetView } from '../lib/derived'
-import { formatApy } from '../lib/format'
+import type { MarketAssetView } from '../../lib/derived'
+import { formatApy } from '../../lib/format'
 
 interface MarketPanelProps {
   assets: MarketAssetView[]

@@ -1,4 +1,4 @@
-import { formatHealthFactor, hfWadToNumber, numberToHfWad } from '../lib/format'
+import { formatHealthFactor, hfWadToNumber, numberToHfWad } from '../../lib/format'
 
 const PRESETS = [
   { label: 'Conservative 2.0', value: 2.0 },

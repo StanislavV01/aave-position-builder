@@ -1,5 +1,5 @@
-import type { PositionView } from '../lib/derived'
-import { formatApy, formatHealthFactor, formatTokenAmount, formatUsd, healthFactorTone } from '../lib/format'
+import type { PositionView } from '../../lib/derived'
+import { formatApy, formatHealthFactor, formatTokenAmount, formatUsd, healthFactorTone } from '../../lib/format'
 
 const TONE_LABEL = { good: 'healthy', warn: 'caution', danger: 'at risk' } as const
 

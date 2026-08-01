@@ -1,4 +1,4 @@
-import type { OpenFlowState } from '../lib/execute'
+import type { OpenFlowState } from '../../lib/execute'
 
 type StepTone = 'done' | 'active' | 'error' | 'idle'
 
