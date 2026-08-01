@@ -1,0 +1,58 @@
+const MAX_UINT256 = (1n << 256n) - 1n
+const WAD = 10n ** 18n
+
+function groupThousands(digits: string): string {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+/** Truncating token formatter. The ONLY place money bigints become strings. */
+export function formatTokenAmount(amount: bigint, decimals: number, maxFrac = 4): string {
+  const neg = amount < 0n
+  const abs = neg ? -amount : amount
+  const unit = 10n ** BigInt(decimals)
+  const whole = abs / unit
+  const frac = abs % unit
+  const fracDigits = frac.toString().padStart(decimals, '0').slice(0, maxFrac).replace(/0+$/, '')
+  if (whole === 0n && fracDigits === '' && frac > 0n) {
+    return `<0.${'0'.repeat(Math.max(maxFrac - 1, 0))}1`
+  }
+  const body = fracDigits === '' ? groupThousands(whole.toString()) : `${groupThousands(whole.toString())}.${fracDigits}`
+  return neg ? `-${body}` : body
+}
+
+/** Base-currency values are USD with 8 decimals on both Aave Base markets. */
+export function formatUsd(base8: bigint): string {
+  const neg = base8 < 0n
+  const abs = neg ? -base8 : base8
+  const whole = abs / 100_000_000n
+  const cents = (abs % 100_000_000n) / 1_000_000n
+  const body = `$${groupThousands(whole.toString())}.${cents.toString().padStart(2, '0')}`
+  return neg ? `-${body}` : body
+}
+
+export function formatHealthFactor(hfWad: bigint): string {
+  if (hfWad === MAX_UINT256) return '∞'
+  if (hfWad > 1000n * WAD) return '>1000'
+  const whole = hfWad / WAD
+  const frac = ((hfWad % WAD) / 10n ** 16n).toString().padStart(2, '0')
+  return `${whole}.${frac}`
+}
+
+export function formatApy(apy: number): string {
+  return `${(apy * 100).toFixed(2)}%`
+}
+
+export function healthFactorTone(hfWad: bigint): 'good' | 'warn' | 'danger' {
+  if (hfWad > 2n * WAD) return 'good'
+  if (hfWad >= 11n * 10n ** 17n) return 'warn'
+  return 'danger'
+}
+
+/** Slider edge conversions — resolution 0.01, safe well inside double precision. */
+export function hfWadToNumber(hfWad: bigint): number {
+  return Number(hfWad / 10n ** 16n) / 100
+}
+
+export function numberToHfWad(n: number): bigint {
+  return BigInt(Math.round(n * 100)) * 10n ** 16n
+}
