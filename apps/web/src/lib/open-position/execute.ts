@@ -397,3 +397,5 @@ export function useOpenPosition() {
 
   return { state, notice, open, runSequential, reset }
 }
+
+export type OpenPositionFlow = ReturnType<typeof useOpenPosition>

@@ -4,6 +4,8 @@ import { useAccount } from 'wagmi'
 import { HfSlider } from './hf-slider'
 import { ExecutePanel } from './execute-panel'
 import { useOpenPositionPlan } from '../../lib/open-position/plan'
+import { useOpenPosition } from '../../lib/open-position/execute'
+import { shouldMountExecutePanel, visiblePlanReasons } from '../../lib/ui/execute-view'
 import { formatHealthFactor, formatTokenAmount, healthFactorTone } from '../../lib/format'
 
 const TONE_LABEL = { good: 'healthy', warn: 'caution', danger: 'at risk' } as const
@@ -19,6 +21,8 @@ export function OpenPositionForm({
   const [targetHfWad, setTargetHfWad] = useState<bigint>(DEFAULT_TARGET_HF)
   const [eModeEnabled, setEModeEnabled] = useState(false)
   const [eModeTouched, setEModeTouched] = useState(false)
+  const [confirmedSummary, setConfirmedSummary] = useState<string | null>(null)
+  const flow = useOpenPosition()
 
   const { plan, collateralView, borrowView, walletBalance, isLoading } = useOpenPositionPlan({
     chainId, collateralAsset, borrowAsset,
@@ -31,12 +35,32 @@ export function OpenPositionForm({
     if (!eModeTouched) setEModeEnabled(recommended) // auto-on when eMode strictly improves LTV
   }, [recommended, eModeTouched])
 
+  // On success: snapshot the executed amounts for the confirmation text (the plan loses
+  // them once the inputs clear), then clear the form so the post-success balance refetch
+  // cannot flag the stale amount as "exceeds wallet balance" over the confirmation.
+  // Deliberately keyed on the phase alone — the closure reads the plan of the render the
+  // transition happened in, which still holds the executed amounts.
+  const phase = flow.state.phase
+  useEffect(() => {
+    if (phase !== 'confirmed') return
+    if (plan?.collateral && plan.borrow) {
+      setConfirmedSummary(
+        `Supplied ${formatTokenAmount(plan.collateral.amount, plan.collateral.asset.decimals)} ${plan.collateral.asset.symbol}, ` +
+          `borrowed ${formatTokenAmount(plan.borrow.amount, plan.borrow.asset.decimals)} ${plan.borrow.asset.symbol}.`,
+      )
+    }
+    setAmountText('')
+    setBorrowText('')
+    setLastEdited('targetHf')
+  }, [phase])
+
   if (isLoading || !collateralView || !borrowView) return <p className="muted">Loading market data…</p>
 
   const borrowDisplay =
     lastEdited === 'targetHf' && plan?.borrow ? formatUnits(plan.borrow.amount, borrowView.decimals) : borrowText
   const sliderValueWad =
     lastEdited === 'borrowAmount' && plan?.predictedHfWad ? plan.predictedHfWad : targetHfWad
+  const reasons = plan ? visiblePlanReasons(plan.reasons, amountText !== '' || borrowText !== '') : []
 
   return (
     <form onSubmit={(e) => e.preventDefault()}>
@@ -117,17 +141,19 @@ export function OpenPositionForm({
         </div>
       ) : null}
 
-      {plan && plan.reasons.length > 0 ? (
+      {reasons.length > 0 ? (
         <div className="error-card">
           <ul>
-            {plan.reasons.map((r) => (
+            {reasons.map((r) => (
               <li key={r}>{r}</li>
             ))}
           </ul>
         </div>
       ) : null}
 
-      {plan && plan.valid && address ? <ExecutePanel plan={plan} chainId={chainId} address={address} /> : null}
+      {plan && address && shouldMountExecutePanel(plan.valid, flow.state.phase) ? (
+        <ExecutePanel plan={plan} chainId={chainId} address={address} flow={flow} confirmedSummary={confirmedSummary} />
+      ) : null}
     </form>
   )
 }
