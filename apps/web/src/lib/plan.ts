@@ -125,7 +125,10 @@ export function planOpenPosition(inputs: PlanInputs): OpenPositionPlan {
     if (best) {
       eModeCandidate = best
       eModeRecommended = best.ltvBps > collateralView.ltvBps
-      if (inputs.eModeEnabled) {
+      // Defensive: only ever set eMode when it strictly improves LTV, even if the
+      // caller passes eModeEnabled=true for a non-improving candidate (the form
+      // gates the toggle on eModeRecommended, but the pure core re-checks it too).
+      if (inputs.eModeEnabled && eModeRecommended) {
         activeCategory = best
         eModeCategoryToSet = best.id
       }

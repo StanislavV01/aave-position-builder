@@ -61,7 +61,7 @@ export function OpenPositionForm({
         </div>
       </div>
 
-      {plan?.eModeCandidate ? (
+      {plan?.eModeCandidate && plan.eModeRecommended ? (
         <div className="field">
           <label>
             <input

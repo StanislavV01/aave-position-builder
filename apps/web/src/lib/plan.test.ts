@@ -49,6 +49,15 @@ const ethCorrelated: EModeCategoryInfo = {
   ltvzeroBitmap: 0n, isolated: false, label: 'ETH correlated',
 }
 
+// Same shared bitmaps as ethCorrelated, but LTV equal to WETH's own LTV (7500) —
+// a shared category that offers no improvement and must never be auto- or
+// manually-settable, even if the caller passes eModeEnabled=true.
+const equalLtvCategory: EModeCategoryInfo = {
+  id: 2, ltvBps: 7500n, liquidationThresholdBps: 9000n, liquidationBonusBps: 10100n,
+  collateralBitmap: (1n << 0n) | (1n << 2n), borrowableBitmap: (1n << 0n) | (1n << 2n),
+  ltvzeroBitmap: 0n, isolated: false, label: 'Equal LTV',
+}
+
 function makeInputs(over: Partial<PlanInputs>): PlanInputs {
   return {
     market, position: null, emodes: [],
@@ -98,6 +107,18 @@ describe('planOpenPosition', () => {
     expect(plan.eModeCandidate?.id).toBe(1)
     expect(plan.eModeCategoryToSet).toBeNull()
     // simulated with base LT 80%: 2000e8*8000/(2e4) = 800e8 → 0.4 cbETH
+    expect(plan.borrow?.amount).toBe(400_000_000_000_000_000n)
+  })
+
+  it('a shared category with no LTV improvement is never set, even if eModeEnabled is true', () => {
+    const plan = planOpenPosition(
+      makeInputs({ borrowAsset: CBETH, emodes: [equalLtvCategory], eModeEnabled: true }),
+    )
+    expect(plan.eModeCandidate?.id).toBe(2)
+    expect(plan.eModeRecommended).toBe(false) // 75% is not > 75%
+    expect(plan.eModeCategoryToSet).toBeNull()
+    // simulation must use base params (LT 80%), NOT the category's LT 90%:
+    // 2000e8*8000/(2e4) = 800e8 → 0.4 cbETH (same as the base-LT case above)
     expect(plan.borrow?.amount).toBe(400_000_000_000_000_000n)
   })
 
