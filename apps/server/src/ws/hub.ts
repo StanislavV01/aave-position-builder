@@ -104,6 +104,18 @@ export class Hub {
     conn.watches.add(`${network}:${address.toLowerCase()}`)
     conn.networks.add(network)
     this.#ensureWatcher(network)
+    // #broadcastStatus only fires on a watcher status CHANGE. A client whose watch
+    // registers while the watcher is already mid-flight (e.g. degraded, or a freshly
+    // created watcher's initial 'connecting') would otherwise hear nothing until the
+    // next transition and sit "live" (socket open) with polling off in the meantime.
+    // Tell this one connection where things stand right now.
+    const entry = this.#watchers.get(network)
+    if (entry !== undefined) {
+      const state = this.#toClientState(entry.watcher.status)
+      if (state !== null) {
+        this.#send(conn.socket, { v: WS_PROTOCOL_VERSION, type: 'status', network, state })
+      }
+    }
   }
 
   #ensureWatcher(network: NetworkKey): void {
@@ -150,12 +162,20 @@ export class Hub {
   }
 
   #broadcastStatus(network: NetworkKey, status: WatcherStatus): void {
-    if (status === 'stopped') return
-    const state = status === 'live' ? ('live' as const) : ('degraded' as const)
+    const state = this.#toClientState(status)
+    if (state === null) return
     const msg: ServerToClient = { v: WS_PROTOCOL_VERSION, type: 'status', network, state }
     for (const client of this.#clients) {
       if (client.networks.has(network)) this.#send(client.socket, msg)
     }
+  }
+
+  // Maps a watcher's internal status to the wire state, or null when nothing should be
+  // sent for it. 'stopped' never reaches a client — the watcher is being torn down (no
+  // clients left watching that network) so there is no one left to tell.
+  #toClientState(status: WatcherStatus): 'live' | 'degraded' | null {
+    if (status === 'stopped') return null
+    return status === 'live' ? 'live' : 'degraded'
   }
 
   #send(socket: WebSocket, msg: ServerToClient): void {

@@ -30,6 +30,10 @@ export function TxProgress({ state, permitPath }: { state: OpenFlowState; permit
     'confirm-wallet': 2, 'pending': 3, 'confirmed': 4, 'fallback-sequential': -1, 'error': -1,
   }
   const level = reached[state.phase]
+  // Which step was in flight when the error hit — falls back to the first step (prior
+  // behavior) if the failure predates the reducer tracking a failedPhase (e.g. an error
+  // dispatched from outside the main flow, such as the sequential fallback).
+  const errorLevel = state.phase === 'error' ? reached[state.failedPhase ?? 'signing-permit'] : -1
   const labels = [
     permitPath ? 'Sign permit (gasless)' : 'Approve spending',
     'Simulate transaction',
@@ -40,7 +44,17 @@ export function TxProgress({ state, permitPath }: { state: OpenFlowState; permit
     <ol className="steps" aria-live="polite">
       {order.map((key, i) => {
         const tone: StepTone =
-          state.phase === 'error' ? (i === 0 ? 'error' : 'idle') : i < level ? 'done' : i === level ? 'active' : 'idle'
+          state.phase === 'error'
+            ? i === errorLevel
+              ? 'error'
+              : i < errorLevel
+                ? 'done'
+                : 'idle'
+            : i < level
+              ? 'done'
+              : i === level
+                ? 'active'
+                : 'idle'
         return (
           <Step key={key} tone={tone}>
             {labels[i]}

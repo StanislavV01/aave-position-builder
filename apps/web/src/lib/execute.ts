@@ -7,6 +7,16 @@ import { ERC20_ABI, POOL_ABI, buildOpenPositionCalls, type MarketConfig } from '
 
 // ---------- state machine (pure) ----------
 
+// The subset of phases that represent an in-flight step of the main (non-fallback) open
+// flow. When an error interrupts one of these, the error variant below records which one
+// so the UI can point at the step that actually failed instead of always blaming the first.
+const IN_PROGRESS_PHASES = ['signing-permit', 'approving', 'simulating', 'confirm-wallet', 'pending'] as const
+export type InProgressPhase = (typeof IN_PROGRESS_PHASES)[number]
+
+function isInProgressPhase(phase: OpenFlowState['phase']): phase is InProgressPhase {
+  return (IN_PROGRESS_PHASES as readonly string[]).includes(phase)
+}
+
 export type OpenFlowState =
   | { phase: 'idle' }
   | { phase: 'signing-permit' }
@@ -16,7 +26,7 @@ export type OpenFlowState =
   | { phase: 'pending'; txHash: Hex }
   | { phase: 'confirmed'; txHash: Hex; blockNumber: bigint }
   | { phase: 'fallback-sequential'; step: number; totalSteps: number; currentTx?: Hex }
-  | { phase: 'error'; message: string; canRetry: boolean; suggestSequential: boolean }
+  | { phase: 'error'; message: string; canRetry: boolean; suggestSequential: boolean; failedPhase?: InProgressPhase }
 
 export type OpenFlowEvent =
   | { type: 'START'; permit: boolean; needsApproval: boolean }
@@ -40,7 +50,13 @@ export function openFlowReducer(state: OpenFlowState, event: OpenFlowEvent): Ope
     case 'USER_REJECTED':
       return { phase: 'idle' }
     case 'ERROR':
-      return { phase: 'error', message: event.message, canRetry: event.canRetry, suggestSequential: event.suggestSequential }
+      return {
+        phase: 'error',
+        message: event.message,
+        canRetry: event.canRetry,
+        suggestSequential: event.suggestSequential,
+        failedPhase: isInProgressPhase(state.phase) ? state.phase : undefined,
+      }
     case 'START':
       if (state.phase !== 'idle' && state.phase !== 'error') return state
       if (event.permit) return { phase: 'signing-permit' }
@@ -56,7 +72,7 @@ export function openFlowReducer(state: OpenFlowState, event: OpenFlowEvent): Ope
       return state.phase === 'simulating' ? { phase: 'confirm-wallet' } : state
     case 'SIMULATION_FAILED':
       return state.phase === 'simulating'
-        ? { phase: 'error', message: event.message, canRetry: true, suggestSequential: true }
+        ? { phase: 'error', message: event.message, canRetry: true, suggestSequential: true, failedPhase: 'simulating' }
         : state
     case 'TX_SUBMITTED':
       return state.phase === 'confirm-wallet' ? { phase: 'pending', txHash: event.txHash } : state

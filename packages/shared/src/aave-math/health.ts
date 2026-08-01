@@ -1,8 +1,16 @@
 // bigint mirror of GenericLogic.calculateUserAccountData (aave-v3-origin v3.6.0).
 // HF = SUM(collateral_base_i * LT_eff_bps_i).wadDiv(totalDebtBase) / 10000
 //    = type(uint256).max when totalDebtBase == 0.
-// The LT-weighted SUM (not the average) feeds wadDiv — averaging first would lose
-// precision the chain keeps. All values are base-currency USD8 / bps / wad bigints.
+// Deliberate one-rounding-step divergence from on-chain: GenericLogic floors
+// avgLT = ltWeightedSum / totalCollateralBase to whole bps FIRST, then derives HF from
+// that already-floored average. Here the LT-weighted SUM feeds wadDiv directly, floored
+// only once at the end — so near the liquidation boundary this client HF can read up to
+// ~1bp/avgLT ABOVE the on-chain value, never below. That's acceptable because this number
+// is advisory, not authoritative: the hard floor for any borrow is HF > 1.0 (WAD) with a
+// separate warn zone below 1.1, both comfortably outside a 1bp/avgLT slack, and every real
+// transaction is gated by an on-chain preflight simulation (simulateContract) that reverts
+// on the ACTUAL on-chain HF regardless of what this client-side estimate says. All values
+// are base-currency USD8 / bps / wad bigints.
 import { PERCENTAGE_FACTOR, WAD, percentMulFloor, wadDiv } from './ray'
 import { isReserveEnabledOnBitmap } from './emode'
 

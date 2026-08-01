@@ -23,6 +23,9 @@ export function PositionSummary({ view, isLoading }: { view: PositionView | null
           {formatHealthFactor(view.account.healthFactorWad)} · {TONE_LABEL[tone]}
         </strong>{' '}
         {view.eModeCategoryId !== 0 ? <span className="badge">eMode: {view.eModeLabel ?? view.eModeCategoryId}</span> : null}
+        {view.account.hasZeroLtvCollateral ? (
+          <span className="badge">some collateral has zero borrowing power</span>
+        ) : null}
       </p>
       {view.supplied.length > 0 ? (
         <>
@@ -35,6 +38,7 @@ export function PositionSummary({ view, isLoading }: { view: PositionView | null
                 <span className="muted tabular">{formatUsd(s.balanceBase)}</span>
                 <span className="apy tabular">{formatApy(s.asset.supplyApy)}</span>
                 {!s.isCollateral ? <span className="badge">not collateral</span> : null}
+                {s.isCollateral && s.asset.ltvBps === 0n ? <span className="badge">zero LTV</span> : null}
               </li>
             ))}
           </ul>

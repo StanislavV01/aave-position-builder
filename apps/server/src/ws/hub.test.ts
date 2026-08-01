@@ -138,11 +138,17 @@ describe('Hub', () => {
     const baseClient = connect(hub)
     watch(sepoliaClient, 'base-sepolia', ADDR)
     watch(baseClient, 'base', ADDR)
+    // Each watch() above created a fresh watcher and immediately sent that registering
+    // client its current ('connecting' -> 'degraded') status — see the registration tests
+    // below. Only the changes that follow are under test here.
     made[0].watcher.emitStatus('live')
     expect(sepoliaClient.sent.filter((m) => m.type === 'status')).toEqual([
+      { v: 1, type: 'status', network: 'base-sepolia', state: 'degraded' },
       { v: 1, type: 'status', network: 'base-sepolia', state: 'live' },
     ])
-    expect(baseClient.sent.filter((m) => m.type === 'status')).toHaveLength(0)
+    expect(baseClient.sent.filter((m) => m.type === 'status')).toEqual([
+      { v: 1, type: 'status', network: 'base', state: 'degraded' },
+    ])
     made[0].watcher.emitStatus('connecting') // non-live maps to degraded
     expect(sepoliaClient.sent.filter((m) => m.type === 'status').at(-1)).toEqual({
       v: 1,
@@ -150,6 +156,42 @@ describe('Hub', () => {
       network: 'base-sepolia',
       state: 'degraded',
     })
+  })
+
+  it('sends the current watcher status to a client the moment it registers a watch (fresh watcher: connecting -> degraded)', () => {
+    const { hub } = makeHub()
+    const socket = connect(hub)
+    watch(socket, 'base-sepolia', ADDR)
+    expect(socket.sent.filter((m) => m.type === 'status')).toEqual([
+      { v: 1, type: 'status', network: 'base-sepolia', state: 'degraded' },
+    ])
+  })
+
+  it('sends the current watcher status to a client that registers after the watcher is already live', () => {
+    const { hub, made } = makeHub()
+    const first = connect(hub)
+    watch(first, 'base-sepolia', ADDR)
+    made[0].watcher.emitStatus('live')
+
+    const second = connect(hub)
+    watch(second, 'base-sepolia', OTHER_ADDR)
+    expect(second.sent.filter((m) => m.type === 'status')).toEqual([
+      { v: 1, type: 'status', network: 'base-sepolia', state: 'live' },
+    ])
+  })
+
+  it('sends the current watcher status to a client that registers while an existing watcher is degraded', () => {
+    const { hub, made } = makeHub()
+    const first = connect(hub)
+    watch(first, 'base-sepolia', ADDR)
+    made[0].watcher.emitStatus('live')
+    made[0].watcher.emitStatus('degraded')
+
+    const second = connect(hub)
+    watch(second, 'base-sepolia', OTHER_ADDR)
+    expect(second.sent.filter((m) => m.type === 'status')).toEqual([
+      { v: 1, type: 'status', network: 'base-sepolia', state: 'degraded' },
+    ])
   })
 
   it('stops the watcher when the last socket watching that network closes', () => {

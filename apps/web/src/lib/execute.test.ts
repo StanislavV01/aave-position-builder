@@ -45,7 +45,7 @@ describe('openFlowReducer — happy paths', () => {
 })
 
 describe('openFlowReducer — failure and fallback paths', () => {
-  it('simulation failure suggests the sequential fallback', () => {
+  it('simulation failure suggests the sequential fallback and attributes the error to the simulate step', () => {
     const s = step(
       { phase: 'idle' },
       { type: 'START', permit: true, needsApproval: false },
@@ -54,6 +54,7 @@ describe('openFlowReducer — failure and fallback paths', () => {
     )
     expect(s).toEqual({
       phase: 'error', message: 'execution reverted: 36', canRetry: true, suggestSequential: true,
+      failedPhase: 'simulating',
     })
   })
 
@@ -95,10 +96,20 @@ describe('openFlowReducer — failure and fallback paths', () => {
     expect(labels.length).toBe(4) // FALLBACK_START totalSteps — the fallback never uses permit
   })
 
-  it('ERROR is reachable from any phase and RESET returns to idle', () => {
+  it('ERROR is reachable from any phase, records which step was in flight, and RESET returns to idle', () => {
     const err: OpenFlowEvent = { type: 'ERROR', message: 'boom', canRetry: true, suggestSequential: false }
     expect(openFlowReducer({ phase: 'pending', txHash: H }, err)).toEqual({
-      phase: 'error', message: 'boom', canRetry: true, suggestSequential: false,
+      phase: 'error', message: 'boom', canRetry: true, suggestSequential: false, failedPhase: 'pending',
+    })
+    expect(openFlowReducer({ phase: 'confirm-wallet' }, err)).toEqual({
+      phase: 'error', message: 'boom', canRetry: true, suggestSequential: false, failedPhase: 'confirm-wallet',
+    })
+    expect(openFlowReducer({ phase: 'approving' }, err)).toEqual({
+      phase: 'error', message: 'boom', canRetry: true, suggestSequential: false, failedPhase: 'approving',
+    })
+    // Not one of the tracked in-progress phases (e.g. mid sequential-fallback) — no failedPhase.
+    expect(openFlowReducer({ phase: 'fallback-sequential', step: 1, totalSteps: 2 }, err)).toEqual({
+      phase: 'error', message: 'boom', canRetry: true, suggestSequential: false, failedPhase: undefined,
     })
     expect(openFlowReducer({ phase: 'error', message: 'boom', canRetry: true, suggestSequential: false }, { type: 'RESET' })).toEqual({ phase: 'idle' })
   })

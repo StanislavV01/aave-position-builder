@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Address } from 'viem'
 import { marketByChainId } from '@app/shared'
 import type { OpenPositionPlan } from '../lib/plan'
@@ -13,6 +14,12 @@ export function ExecutePanel({ plan, chainId, address }: { plan: OpenPositionPla
   const permitSupport = usePermitSupport(chainId, collateral?.asset.asset)
   const tokenState = useTokenState(chainId, address, collateral?.asset.asset)
   const { state, notice, open, runSequential, reset } = useOpenPosition()
+  // Guards the error-card buttons against a double-click: runSequential() dispatches
+  // FALLBACK_START (which flips state.phase away from 'error', unmounting this card) only
+  // after its first await, so a second click landing before that re-render would otherwise
+  // fire a second sequential run or race a Dismiss against it. True for the click-to-dispatch
+  // gap only — same busy-style guard as the primary CTA's `disabled={busy}` below.
+  const [sequentialStarting, setSequentialStarting] = useState(false)
 
   if (!market || !collateral || !borrow) return null
   if (!plan.valid) return null
@@ -53,12 +60,19 @@ export function ExecutePanel({ plan, chainId, address }: { plan: OpenPositionPla
         <div className="error-card" role="alert" tabIndex={-1}>
           <p>{state.message}</p>
           {state.suggestSequential ? (
-            <button className="ghost" onClick={() => void runSequential(executable)}>
+            <button
+              className="ghost"
+              disabled={sequentialStarting}
+              onClick={() => {
+                setSequentialStarting(true)
+                void runSequential(executable).finally(() => setSequentialStarting(false))
+              }}
+            >
               Try step-by-step instead
             </button>
           ) : null}
           {state.canRetry ? (
-            <button className="ghost" onClick={() => reset()}>
+            <button className="ghost" disabled={sequentialStarting} onClick={() => reset()}>
               Dismiss
             </button>
           ) : null}
