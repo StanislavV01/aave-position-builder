@@ -66,6 +66,11 @@ export class NetworkWatcher {
   #watchdogHandle: unknown = null
   #reconnectHandle: unknown = null
   #repairInFlight = false
+  // Low-water mark: the earliest fromBlock we still owe a gap repair for. Set when a
+  // repair starts, cleared ONLY on success. A failed repair (rate-limit, range-too-large,
+  // timeout) leaves it set so the range is retried, instead of being silently superseded
+  // by a later, higher lastBlockSeen+1 once more heads arrive.
+  #pendingRepairFromBlock: number | null = null
   readonly #positionCbs = new Set<(e: PositionEvent) => void>()
   readonly #statusCbs = new Set<(s: WatcherStatus) => void>()
   readonly #poolLogCbs = new Set<(l: PoolLogEvent) => void>()
@@ -175,7 +180,11 @@ export class NetworkWatcher {
     })
     this.#send({ jsonrpc: '2.0', id: headsId, method: 'eth_subscribe', params: ['newHeads'] })
     if (this.#lastBlockSeen !== null) {
-      void this.#repairGap(this.#lastBlockSeen + 1)
+      // Use whichever is earlier: a still-outstanding failed repair's range, or the
+      // naive lastBlockSeen+1. This is what makes a failed repair's range durable.
+      const naturalFromBlock = this.#lastBlockSeen + 1
+      const fromBlock = Math.min(this.#pendingRepairFromBlock ?? Infinity, naturalFromBlock)
+      void this.#repairGap(fromBlock)
     }
     this.#armWatchdog()
   }
@@ -246,6 +255,9 @@ export class NetworkWatcher {
       return
     }
     this.#repairInFlight = true
+    // Set BEFORE the request completes: if it fails, this stays as the low-water mark for
+    // the next attempt (see #onOpen). If it succeeds, it is cleared below.
+    this.#pendingRepairFromBlock = fromBlock
     try {
       const res = await this.#deps.upstream.rpc(this.#deps.market.networkKey, {
         jsonrpc: '2.0',
@@ -265,9 +277,12 @@ export class NetworkWatcher {
         this.#deps.log.info({ fromBlock, count: body.result.length }, 'gap repair fetched missed logs')
         for (const log of body.result) this.#handleLog(log as RawLog)
       }
+      this.#pendingRepairFromBlock = null // success — this range is fully covered now
     } catch (err) {
-      // UpstreamError messages are already sanitized; nothing else is rethrown from upstream.ts
-      this.#deps.log.warn({ reason: err instanceof Error ? err.message : 'unknown' }, 'gap repair failed')
+      // UpstreamError messages are already sanitized; nothing else is rethrown from upstream.ts.
+      // Deliberately leave #pendingRepairFromBlock set — the next repair attempt must retry
+      // from `fromBlock`, not from wherever lastBlockSeen has advanced to since.
+      this.#deps.log.warn({ reason: err instanceof Error ? err.message : 'unknown', fromBlock }, 'gap repair failed')
     } finally {
       this.#repairInFlight = false
     }

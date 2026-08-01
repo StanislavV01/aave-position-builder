@@ -69,14 +69,18 @@ class FakeUpstream {
   /** When true, eth_getLogs calls do not resolve until resolvePendingGetLogs() is called —
    *  lets tests exercise overlapping/in-flight gap-repair races deterministically. */
   deferGetLogs = false
-  #pendingGetLogs: { id: unknown; resolve: (v: { status: number; body: unknown }) => void }[] = []
+  #pendingGetLogs: {
+    id: unknown
+    resolve: (v: { status: number; body: unknown }) => void
+    reject: (err: unknown) => void
+  }[] = []
   async rpc(network: string, body: unknown): Promise<{ status: number; body: unknown }> {
     const req = body as { id?: unknown; method?: string; params?: unknown[] }
     if (req.method === 'eth_getLogs') {
       this.getLogsCalls.push({ network, params: req.params ?? [] })
       if (this.deferGetLogs) {
-        return new Promise((resolve) => {
-          this.#pendingGetLogs.push({ id: req.id ?? null, resolve })
+        return new Promise((resolve, reject) => {
+          this.#pendingGetLogs.push({ id: req.id ?? null, resolve, reject })
         })
       }
       return { status: 200, body: { jsonrpc: '2.0', id: req.id ?? null, result: this.getLogsResult } }
@@ -88,6 +92,13 @@ class FakeUpstream {
     const pending = this.#pendingGetLogs.shift()
     if (pending === undefined) return
     pending.resolve({ status: 200, body: { jsonrpc: '2.0', id: pending.id, result } })
+  }
+  /** Rejects the oldest pending deferred eth_getLogs call (FIFO) — simulates a rate-limit,
+   *  range-too-large, or timeout error from the upstream during connection churn. */
+  rejectPendingGetLogs(err: unknown): void {
+    const pending = this.#pendingGetLogs.shift()
+    if (pending === undefined) return
+    pending.reject(err)
   }
   get pendingGetLogsCount(): number {
     return this.#pendingGetLogs.length
@@ -391,5 +402,51 @@ describe('NetworkWatcher', () => {
     await flush()
     expect(h.events.map((e) => e.event)).toEqual(['Supply']) // emitted exactly once
     expect(h.events[0].blockNumber).toBe(101)
+  })
+
+  it('a failed gap repair keeps its fromBlock as a low-water mark for the next attempt', async () => {
+    const h = makeHarness()
+    h.upstream.deferGetLogs = true
+    h.watcher.start()
+    const s1 = h.upstream.sockets[0]
+    s1.open()
+    confirmSubs(s1)
+    sendHead(s1, 100)
+    s1.emit('close')
+    h.clock.advance(1000)
+
+    const s2 = h.upstream.sockets[1]
+    s2.open() // triggers gap-repair(101) — deferred
+    confirmSubs(s2)
+    expect(h.upstream.getLogsCalls).toHaveLength(1)
+    expect(h.upstream.getLogsCalls[0].params[0]).toMatchObject({ fromBlock: '0x65' }) // 100 + 1
+
+    h.upstream.rejectPendingGetLogs(new Error('rate limited'))
+    await flush() // repair-A settles: #repairInFlight clears, but the low-water mark (101) stays
+
+    // More heads arrive on s2 before it disconnects again — a naive fromBlock (lastBlockSeen+1)
+    // would jump straight past the never-repaired [101, 150] range.
+    sendHead(s2, 150)
+    s2.emit('close')
+    h.clock.advance(1000) // backoff was reset to base by the live head
+
+    const s3 = h.upstream.sockets[2]
+    s3.open() // must retry the ORIGINAL failed range (101), not the naive 151
+    confirmSubs(s3)
+    expect(h.upstream.getLogsCalls).toHaveLength(2)
+    expect(h.upstream.getLogsCalls[1].params[0]).toMatchObject({ fromBlock: '0x65' }) // still 101 — the low-water mark held
+
+    h.upstream.resolvePendingGetLogs([])
+    await flush() // success this time — the low-water mark clears
+
+    sendHead(s3, 160)
+    s3.emit('close')
+    h.clock.advance(1000)
+
+    const s4 = h.upstream.sockets[3]
+    s4.open() // mark is clear — back to the ordinary lastBlockSeen+1
+    confirmSubs(s4)
+    expect(h.upstream.getLogsCalls).toHaveLength(3)
+    expect(h.upstream.getLogsCalls[2].params[0]).toMatchObject({ fromBlock: '0xa1' }) // 160 + 1
   })
 })
