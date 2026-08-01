@@ -47,8 +47,10 @@
   --transition: 130ms ease;
   accent-color: var(--accent); /* native range slider + checkbox follow the brand */
 }
+/* Dark palette. Applied two ways: OS preference (unless the user forced light) and
+   an explicit data-theme choice from the topbar toggle. Keep both blocks in sync. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     color-scheme: dark;
     --bg: #131318; --surface: #1c1c23; --border: #32323c; --border-strong: #787885;
     --text: #ececf1; --text-muted: #9c9ca8;
@@ -57,6 +59,15 @@
     --ok-bg: #14301f; --warn-bg: #33290f; --danger-bg: #331714;
     --select-chevron: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239c9ca8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
   }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #131318; --surface: #1c1c23; --border: #32323c; --border-strong: #787885;
+  --text: #ececf1; --text-muted: #9c9ca8;
+  --accent: #818cf8; --accent-hover: #99a2fa; --accent-contrast: #17171c;
+  --ok: #4ade80; --warn: #fbbf24; --danger: #f87171;
+  --ok-bg: #14301f; --warn-bg: #33290f; --danger-bg: #331714;
+  --select-chevron: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239c9ca8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 /* Semantic tone slots: set data-tone on any element, consume via .tone-chip etc. */

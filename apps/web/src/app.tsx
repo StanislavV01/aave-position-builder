@@ -5,6 +5,7 @@ import type { Address } from 'viem'
 import { marketByChainId } from '@app/shared'
 import { ConnectCta } from './components/wallet/connect-cta'
 import { NetworkSwitcher } from './components/wallet/network-switcher'
+import { ThemeToggle } from './components/wallet/theme-toggle'
 import { MarketPanel } from './components/market/panel'
 import { PositionSummary } from './components/position/summary'
 import { OpenPositionForm } from './components/open-position/form'
@@ -70,6 +71,7 @@ export function App() {
     <div className="layout">
       <header className="topbar">
         <h1>Aave V3 Position Builder</h1>
+        <ThemeToggle />
         <NetworkSwitcher chainId={chainId} onChange={handleNetworkChange} />
         {isConnected && address ? (
           <span className="account tabular">
