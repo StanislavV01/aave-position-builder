@@ -1,6 +1,10 @@
 # Aave V3 Position Builder
 
-Open a collateralized borrow position on Aave V3 (Base / Base Sepolia) in one transaction, sized by a target health factor, with eMode capital-efficiency detection. Reads go through a key-guarding RPC proxy; a WebSocket hub pushes position events so the UI updates within seconds of confirmation. Design tradeoffs live in [docs/DECISIONS.md](docs/DECISIONS.md).
+Open a collateralized borrow position on Aave V3 (Base / Base Sepolia) in one transaction, sized by a target health factor, with eMode capital-efficiency detection. Reads go through a key-guarding RPC proxy; a WebSocket hub pushes position events so the UI updates within seconds of confirmation.
+
+Quickstart: `cp .env.example .env` (set `DRPC_KEY`), `pnpm install`, `pnpm dev` — then open http://localhost:5173.
+
+Design tradeoffs live in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Architecture
 
