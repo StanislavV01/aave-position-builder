@@ -106,7 +106,43 @@ what we do → would change my mind (noted once, for all three).
   socket otherwise crashes the process. Would change my mind: nothing — confirmed against
   `ws`/Node's documented event semantics.
 
-## 10. Constraint model scope: LTV + liquidity only (caps/isolation deferred)
+## 10. Design & robustness pass (post-review)
+A structured audit (a11y / UX / visual / code axes) drove one pass of fixes, ordered by what
+the brief actually grades — failure behavior first, pixels last.
+
+**Robustness (the "when things don't go smoothly" axis).** Four defects fixed, each with unit
+tests on the extracted pure logic: double-submit after a confirmed open ran the full wallet
+flow over a frozen UI (drivers now check `canStartOpenFlow` + a synchronous lock; Enter no
+longer implicitly submits); the post-success balance refetch destroyed the confirmation and
+replaced it with a spurious validation error (flow state lifted to the form, amounts
+snapshotted, inputs cleared); failed userReserves/eModes/reserveIds queries produced lying
+states — "Connect a wallet" for a connected user, a silently empty market, a permanent
+loading line (pure pane-state selectors with a stale-data-wins rule now drive error cards
+with Retry); wallet connect/switch errors were 12px muted fine print (now role=alert cards).
+
+**Product surface.** The health factor is the risk number of the position, so it is the one
+hero element: a large tabular numeral over a linear 1.0→3.0 track with the liquidation
+boundary visible, zoned by the same `healthFactorTone` thresholds used everywhere (compact
+variant previews post-borrow HF in the form). Token icons are vendored from bgd-labs/icons
+(64KB, no dependency) with an initials fallback for unknown testnet listings.
+
+**Accessibility (WCAG 2.2 AA, contrast computed not eyeballed).** Warn tone was 4.29:1 on its
+tint — now 5.12:1; control borders got a dedicated `--border-strong` ≥3.6:1 both themes
+(1.4.11). Async outcomes are announced: an always-mounted live region hosts the tx steps,
+notices/confirmation carry role=status, validation errors are a polite live region tied to
+the inputs via aria-invalid/aria-describedby. Focus is designed (`:focus-visible` ring
+everywhere), a skip link exists, the summary is real tables with SR column headers, step
+glyphs have spoken alternatives, and all motion (transitions, skeleton pulse) is gated
+behind prefers-reduced-motion.
+
+**Visual system.** Tokens are the single source of truth: 4/8px spacing scale, fixed type
+scale with a 12.8px floor for risk-critical fine print, per-theme chevron, tone slots
+(`data-tone`) replacing three hand-written tone triplets. A system/light/dark toggle
+(default: system) applies the stored choice before first paint. Deliberately NOT done:
+webfonts (system stack is instant and CLS-free), shadows/elevation (flat is a choice),
+and any re-theming — the existing indigo minimalism was polished, not replaced.
+
+## 11. Constraint model scope: LTV + liquidity only (caps/isolation deferred)
 Max borrow is `min(LTV borrowing power, available liquidity)`, and those are the only two
 constraints the UI names as the binding limit. Aave's remaining borrow-side rules — borrow/supply
 caps, isolation-mode debt ceilings, siloed borrowing — are decoded (`ui-pool-data-provider.ts`
