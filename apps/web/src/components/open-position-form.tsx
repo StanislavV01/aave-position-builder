@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { formatUnits, type Address } from 'viem'
+import { useAccount } from 'wagmi'
 import { HfSlider } from './hf-slider'
+import { ExecutePanel } from './execute-panel'
 import { useOpenPositionPlan } from '../lib/plan'
 import { formatHealthFactor, formatTokenAmount, healthFactorTone } from '../lib/format'
 
@@ -10,6 +12,7 @@ const DEFAULT_TARGET_HF = 2n * 10n ** 18n
 export function OpenPositionForm({
   chainId, collateralAsset, borrowAsset,
 }: { chainId: number; collateralAsset: Address; borrowAsset: Address }) {
+  const { address } = useAccount()
   const [amountText, setAmountText] = useState('')
   const [borrowText, setBorrowText] = useState('')
   const [lastEdited, setLastEdited] = useState<'targetHf' | 'borrowAmount'>('targetHf')
@@ -124,7 +127,7 @@ export function OpenPositionForm({
         </div>
       ) : null}
 
-      {/* EXECUTION PANEL — replaced in the execution task */}
+      {plan && plan.valid && address ? <ExecutePanel plan={plan} chainId={chainId} address={address} /> : null}
     </form>
   )
 }
