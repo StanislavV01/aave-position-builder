@@ -3,7 +3,11 @@ import type { OpenFlowState } from '../../lib/open-position/execute'
 type StepTone = 'done' | 'active' | 'error' | 'idle'
 
 function Step({ tone, children }: { tone: StepTone; children: React.ReactNode }) {
-  return <li className={`step-${tone}`}>{children}</li>
+  return (
+    <li className="step" data-state={tone}>
+      {children}
+    </li>
+  )
 }
 
 export function TxProgress({ state, permitPath }: { state: OpenFlowState; permitPath: boolean }) {

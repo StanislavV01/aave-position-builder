@@ -18,7 +18,7 @@ export function HfGauge({
     <div className={compact ? 'hf-gauge hf-gauge-compact' : 'hf-gauge'}>
       <div className="hf-gauge-head">
         <span className="hf-gauge-caption">{caption}</span>
-        <strong className={`hf-gauge-value tabular hf-${tone}`}>
+        <strong className="hf-gauge-value tabular tone-chip" data-tone={tone}>
           {value} · {TONE_LABEL[tone]}
         </strong>
       </div>

@@ -29,36 +29,64 @@ export function PositionSummary({ view, isLoading }: { view: PositionView | null
       ) : null}
       {view.supplied.length > 0 ? (
         <>
-          <h3 className="muted">Supplied</h3>
-          <ul className="asset-list">
-            {view.supplied.map((s) => (
-              <li key={s.asset.asset} className="asset-row">
-                <TokenIcon symbol={s.asset.symbol} />
-                <strong>{s.asset.symbol}</strong>
-                <span className="tabular">{formatTokenAmount(s.balance, s.asset.decimals)}</span>
-                <span className="muted tabular">{formatUsd(s.balanceBase)}</span>
-                <span className="apy tabular">{formatApy(s.asset.supplyApy)}</span>
-                {!s.isCollateral ? <span className="badge">not collateral</span> : null}
-                {s.isCollateral && s.asset.ltvBps === 0n ? <span className="badge">zero LTV</span> : null}
-              </li>
-            ))}
-          </ul>
+          <h3 id="supplied-heading">Supplied</h3>
+          <table className="position-table" aria-labelledby="supplied-heading">
+            <thead className="visually-hidden">
+              <tr>
+                <th scope="col">Asset</th>
+                <th scope="col">Balance</th>
+                <th scope="col">Value</th>
+                <th scope="col">Supply APY</th>
+              </tr>
+            </thead>
+            <tbody>
+              {view.supplied.map((s) => (
+                <tr key={s.asset.asset}>
+                  <td>
+                    <span className="position-asset">
+                      <TokenIcon symbol={s.asset.symbol} />
+                      <strong>{s.asset.symbol}</strong>
+                      {!s.isCollateral ? <span className="badge">not collateral</span> : null}
+                      {s.isCollateral && s.asset.ltvBps === 0n ? <span className="badge">zero LTV</span> : null}
+                    </span>
+                  </td>
+                  <td className="num tabular">{formatTokenAmount(s.balance, s.asset.decimals)}</td>
+                  <td className="num tabular muted">{formatUsd(s.balanceBase)}</td>
+                  <td className="num tabular">{formatApy(s.asset.supplyApy)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </>
       ) : null}
       {view.borrowed.length > 0 ? (
         <>
-          <h3 className="muted">Borrowed</h3>
-          <ul className="asset-list">
-            {view.borrowed.map((b) => (
-              <li key={b.asset.asset} className="asset-row">
-                <TokenIcon symbol={b.asset.symbol} />
-                <strong>{b.asset.symbol}</strong>
-                <span className="tabular">{formatTokenAmount(b.debt, b.asset.decimals)}</span>
-                <span className="muted tabular">{formatUsd(b.debtBase)}</span>
-                <span className="apy tabular">{formatApy(b.asset.borrowApy)}</span>
-              </li>
-            ))}
-          </ul>
+          <h3 id="borrowed-heading">Borrowed</h3>
+          <table className="position-table" aria-labelledby="borrowed-heading">
+            <thead className="visually-hidden">
+              <tr>
+                <th scope="col">Asset</th>
+                <th scope="col">Debt</th>
+                <th scope="col">Value</th>
+                <th scope="col">Borrow APY</th>
+              </tr>
+            </thead>
+            <tbody>
+              {view.borrowed.map((b) => (
+                <tr key={b.asset.asset}>
+                  <td>
+                    <span className="position-asset">
+                      <TokenIcon symbol={b.asset.symbol} />
+                      <strong>{b.asset.symbol}</strong>
+                    </span>
+                  </td>
+                  <td className="num tabular">{formatTokenAmount(b.debt, b.asset.decimals)}</td>
+                  <td className="num tabular muted">{formatUsd(b.debtBase)}</td>
+                  <td className="num tabular">{formatApy(b.asset.borrowApy)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </>
       ) : null}
       <p className="muted tabular">
