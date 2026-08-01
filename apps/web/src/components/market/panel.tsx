@@ -1,6 +1,7 @@
 import type { Address } from 'viem'
 import type { MarketAssetView } from '../../lib/data/derived'
 import { formatApy } from '../../lib/format'
+import { TokenIcon } from '../shared/token-icon'
 
 interface MarketPanelProps {
   assets: MarketAssetView[]
@@ -24,6 +25,7 @@ function AssetRow({
   return (
     <li>
       <button className="asset-row" disabled={!enabled} aria-pressed={selected} onClick={onSelect}>
+        <TokenIcon symbol={asset.symbol} />
         <strong>{asset.symbol}</strong>
         {enabled ? (
           <span className="apy tabular">

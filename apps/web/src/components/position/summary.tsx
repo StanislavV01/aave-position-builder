@@ -1,6 +1,7 @@
 import type { PositionView } from '../../lib/data/derived'
 import { formatApy, formatTokenAmount, formatUsd } from '../../lib/format'
 import { HfGauge } from './hf-gauge'
+import { TokenIcon } from '../shared/token-icon'
 
 export function PositionSummary({ view, isLoading }: { view: PositionView | null; isLoading: boolean }) {
   if (isLoading) return <p className="muted">Loading position…</p>
@@ -32,6 +33,7 @@ export function PositionSummary({ view, isLoading }: { view: PositionView | null
           <ul className="asset-list">
             {view.supplied.map((s) => (
               <li key={s.asset.asset} className="asset-row">
+                <TokenIcon symbol={s.asset.symbol} />
                 <strong>{s.asset.symbol}</strong>
                 <span className="tabular">{formatTokenAmount(s.balance, s.asset.decimals)}</span>
                 <span className="muted tabular">{formatUsd(s.balanceBase)}</span>
@@ -49,6 +51,7 @@ export function PositionSummary({ view, isLoading }: { view: PositionView | null
           <ul className="asset-list">
             {view.borrowed.map((b) => (
               <li key={b.asset.asset} className="asset-row">
+                <TokenIcon symbol={b.asset.symbol} />
                 <strong>{b.asset.symbol}</strong>
                 <span className="tabular">{formatTokenAmount(b.debt, b.asset.decimals)}</span>
                 <span className="muted tabular">{formatUsd(b.debtBase)}</span>

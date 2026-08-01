@@ -70,6 +70,14 @@ button { font: inherit; }
 .reason { font-size: 0.78rem; color: var(--text-muted); }
 .badge { display: inline-block; border: 1px solid var(--border); border-radius: 999px; padding: 0 0.5rem; font-size: 0.78rem; }
 
+.token-icon { border-radius: 50%; flex-shrink: 0; align-self: center; }
+.token-icon-fallback {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--icon-size, 20px); height: var(--icon-size, 20px);
+  background: var(--border); color: var(--text-muted);
+  font-size: calc(var(--icon-size, 20px) * 0.38); font-weight: 600; text-transform: uppercase;
+}
+
 .hf-good { color: var(--ok); background: var(--ok-bg); border-radius: var(--radius); padding: 0 0.4rem; }
 .hf-warn { color: var(--warn); background: var(--warn-bg); border-radius: var(--radius); padding: 0 0.4rem; }
 .hf-danger { color: var(--danger); background: var(--danger-bg); border-radius: var(--radius); padding: 0 0.4rem; }
