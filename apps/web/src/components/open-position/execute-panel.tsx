@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { Address } from 'viem'
 import { marketByChainId } from '@app/shared'
-import type { OpenPositionPlan } from '../../lib/plan'
-import { useOpenPosition, type ExecutablePlan } from '../../lib/execute'
-import { usePermitSupport, useTokenState } from '../../lib/token-queries'
+import type { OpenPositionPlan } from '../../lib/open-position/plan'
+import { useOpenPosition, type ExecutablePlan } from '../../lib/open-position/execute'
+import { usePermitSupport, useTokenState } from '../../lib/data/token-queries'
 import { formatTokenAmount } from '../../lib/format'
 import { TxProgress } from './tx-progress'
 

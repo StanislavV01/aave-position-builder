@@ -59,7 +59,7 @@ const out = {
   eModesHex,
   reserveIds,
 }
-const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'lib', '__fixtures__')
+const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'lib', 'data', '__fixtures__')
 mkdirSync(dir, { recursive: true })
 writeFileSync(join(dir, 'base-sepolia.json'), JSON.stringify(out, null, 2) + '\n')
 console.log(`wrote base-sepolia.json at block ${Number(blockHex)} with ${Object.keys(reserveIds).length} reserve ids`)

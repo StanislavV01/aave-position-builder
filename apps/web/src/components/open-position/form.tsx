@@ -3,7 +3,7 @@ import { formatUnits, type Address } from 'viem'
 import { useAccount } from 'wagmi'
 import { HfSlider } from './hf-slider'
 import { ExecutePanel } from './execute-panel'
-import { useOpenPositionPlan } from '../../lib/plan'
+import { useOpenPositionPlan } from '../../lib/open-position/plan'
 import { formatHealthFactor, formatTokenAmount, healthFactorTone } from '../../lib/format'
 
 const TONE_LABEL = { good: 'healthy', warn: 'caution', danger: 'at risk' } as const

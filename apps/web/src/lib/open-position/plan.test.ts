@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Address } from 'viem'
 import { computeAccountData, type EModeCategoryInfo } from '@app/shared'
-import type { MarketAssetView, PositionView } from './derived'
+import type { MarketAssetView, PositionView } from '../data/derived'
 import { parseAmount, planOpenPosition, type PlanInputs } from './plan'
 
 const WAD = 10n ** 18n

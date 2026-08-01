@@ -12,9 +12,9 @@ import {
   type EModeCategoryInfo,
   type EModeRiskOverride,
 } from '@app/shared'
-import { buildMarketView, buildPositionView, type MarketAssetView, type PositionView } from './derived'
-import { useEModes, useReserveIds, useReservesData, useUserReservesData } from './market-queries'
-import { useTokenState } from './token-queries'
+import { buildMarketView, buildPositionView, type MarketAssetView, type PositionView } from '../data/derived'
+import { useEModes, useReserveIds, useReservesData, useUserReservesData } from '../data/market-queries'
+import { useTokenState } from '../data/token-queries'
 
 const WAD = 10n ** 18n
 const WARN_HF_WAD = 11n * 10n ** 17n

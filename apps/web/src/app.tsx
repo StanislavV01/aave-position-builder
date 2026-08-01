@@ -9,9 +9,9 @@ import { MarketPanel } from './components/market/panel'
 import { PositionSummary } from './components/position/summary'
 import { OpenPositionForm } from './components/open-position/form'
 import { PoolRevisionNote, StatusChip } from './components/position/status-chip'
-import { useEModes, useReserveIds, useReservesData, useUserReservesData } from './lib/market-queries'
-import { buildMarketView, buildPositionView } from './lib/derived'
-import { useLiveUpdates } from './lib/live'
+import { useEModes, useReserveIds, useReservesData, useUserReservesData } from './lib/data/market-queries'
+import { buildMarketView, buildPositionView } from './lib/data/derived'
+import { useLiveUpdates } from './lib/live/updates'
 
 export function App() {
   const [chainId, setChainId] = useState<number>(baseSepolia.id)

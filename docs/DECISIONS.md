@@ -39,7 +39,7 @@ field.
 Chosen: both ABIs are now vendored per network from verified source, proven by two tests:
 `packages/shared/src/abis/ui-pool-data-provider.test.ts` asserts per-network shapes/field
 positions and the cross-network shape-mismatch rejection (base-shaped data decoded as sepolia,
-and vice versa, both throw — the silent-corruption guard); `apps/web/src/lib/derived.test.ts`
+and vice versa, both throw — the silent-corruption guard); `apps/web/src/lib/data/derived.test.ts`
 decodes one captured real on-chain payload (`__fixtures__/base-sepolia.json`) through the same
 code path the app uses. The eMode zod schemas are `z.strictObject`, not just required-field
 checks — `.strict()` catches the corrupting direction (an unrecognized extra key).
