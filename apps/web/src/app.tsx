@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useAccount, useDisconnect } from 'wagmi'
 import { baseSepolia } from 'wagmi/chains'
 import type { Address } from 'viem'
+import { marketByChainId } from '@app/shared'
 import { ConnectCta } from './components/connect-cta'
 import { NetworkSwitcher } from './components/network-switcher'
 import { MarketPanel } from './components/market-panel'
@@ -10,6 +11,7 @@ import { OpenPositionForm } from './components/open-position-form'
 import { PoolRevisionNote, StatusChip } from './components/status-chip'
 import { useEModes, useReserveIds, useReservesData, useUserReservesData } from './lib/market-queries'
 import { buildMarketView, buildPositionView } from './lib/derived'
+import { useLiveUpdates } from './lib/live'
 
 export function App() {
   const [chainId, setChainId] = useState<number>(baseSepolia.id)
@@ -17,9 +19,11 @@ export function App() {
   const [borrowAsset, setBorrowAsset] = useState<Address | null>(null)
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
+  const networkKey = marketByChainId(chainId)?.networkKey ?? 'base-sepolia'
+  const live = useLiveUpdates(networkKey, address)
 
-  const reserves = useReservesData(chainId)
-  const userReserves = useUserReservesData(chainId, address)
+  const reserves = useReservesData(chainId, live.pollMs)
+  const userReserves = useUserReservesData(chainId, address, live.pollMs)
   const emodes = useEModes(chainId)
   const reserveIds = useReserveIds(chainId)
 
@@ -101,7 +105,7 @@ export function App() {
         </section>
       </main>
       <footer className="statusbar">
-        <StatusChip status="degraded" lastEventAtMs={null} />
+        <StatusChip status={live.status} lastEventAtMs={live.lastEventAtMs} />
         <PoolRevisionNote chainId={chainId} />
       </footer>
     </div>
