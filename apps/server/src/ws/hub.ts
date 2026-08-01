@@ -78,7 +78,7 @@ export class Hub {
   }
 
   async close(): Promise<void> {
-    const entries = [...this.#watchers.values()]
+    const entries = [...this.#watchers.entries()]
     this.#watchers.clear()
     for (const conn of [...this.#clients]) {
       try {
@@ -88,9 +88,15 @@ export class Hub {
       }
     }
     this.#clients.clear()
-    for (const entry of entries) {
+    for (const [network, entry] of entries) {
       for (const unsub of entry.unsubs) unsub()
-      await entry.watcher.stop()
+      try {
+        await entry.watcher.stop()
+      } catch (err) {
+        // Never let one watcher's failed stop() abort teardown of the rest —
+        // close() must always attempt every watcher and always resolve.
+        this.#deps.log.warn({ err, network }, 'watcher stop failed during close')
+      }
     }
   }
 
@@ -122,7 +128,9 @@ export class Hub {
     this.#watchers.delete(network)
     for (const unsub of entry.unsubs) unsub()
     this.#deps.log.info({ network }, 'stopping network watcher (no clients left)')
-    void entry.watcher.stop()
+    entry.watcher.stop().catch((err: unknown) => {
+      this.#deps.log.warn({ err, network }, 'watcher stop failed')
+    })
   }
 
   #fanoutPositionEvent(e: PositionEvent): void {

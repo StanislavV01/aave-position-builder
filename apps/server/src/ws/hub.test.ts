@@ -198,4 +198,63 @@ describe('Hub', () => {
     expect(b.closeCode).toBe(1001)
     expect(made.every((m) => m.watcher.stopped)).toBe(true)
   })
+
+  it('does not produce an unhandled rejection when watcher.stop() rejects, and re-watch creates a fresh watcher', async () => {
+    const made: FakeWatcher[] = []
+    let callCount = 0
+    const hub = new Hub({
+      heartbeatSec: 12,
+      log: pino({ level: 'silent' }),
+      makeWatcher: () => {
+        callCount += 1
+        const watcher = new FakeWatcher()
+        if (callCount === 1) {
+          watcher.stop = async () => {
+            watcher.stopped = true
+            throw new Error('stop failed')
+          }
+        }
+        made.push(watcher)
+        return watcher as unknown as NetworkWatcher
+      },
+    })
+    const a = connect(hub)
+    watch(a, 'base-sepolia', ADDR)
+    a.close()
+    // Let the rejected stop() promise's .catch() handler run before asserting.
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(made[0].stopped).toBe(true)
+    expect(hub.networkStatus('base-sepolia')).toBeNull()
+
+    const b = connect(hub)
+    watch(b, 'base-sepolia', ADDR)
+    expect(made).toHaveLength(2)
+    expect(made[1]).not.toBe(made[0])
+    expect(made[1].started).toBe(true)
+  })
+
+  it('close() still resolves and stops every watcher even if one watcher.stop() rejects', async () => {
+    const made: { network: string; watcher: FakeWatcher }[] = []
+    const hub = new Hub({
+      heartbeatSec: 12,
+      log: pino({ level: 'silent' }),
+      makeWatcher: (market) => {
+        const watcher = new FakeWatcher()
+        if (market.networkKey === 'base-sepolia') {
+          watcher.stop = async () => {
+            watcher.stopped = true
+            throw new Error('stop failed')
+          }
+        }
+        made.push({ network: market.networkKey, watcher })
+        return watcher as unknown as NetworkWatcher
+      },
+    })
+    const a = connect(hub)
+    const b = connect(hub)
+    watch(a, 'base-sepolia', ADDR)
+    watch(b, 'base', ADDR)
+    await expect(hub.close()).resolves.toBeUndefined()
+    expect(made.every((m) => m.watcher.stopped)).toBe(true)
+  })
 })
