@@ -42,19 +42,35 @@ class FakeSocket extends EventEmitter {
   sent: Record<string, unknown>[] = []
   closed = false
   terminated = false
+  opened = false
   send(data: string): void {
     this.sent.push(JSON.parse(data) as Record<string, unknown>)
   }
   close(): void {
     this.closed = true
-    this.emit('close')
+    this.#closeOrAbort()
   }
   terminate(): void {
     this.terminated = true
-    this.emit('close')
+    this.#closeOrAbort()
+  }
+  // Mirrors real `ws` semantics: a socket that never finished connecting emits 'error'
+  // ("WebSocket was closed before the connection was established") THEN 'close' when
+  // closed/terminated — asynchronously (ws does this via process.nextTick), not inline.
+  // An already-open socket just closes normally with no error.
+  #closeOrAbort(): void {
+    if (this.opened) {
+      this.emit('close')
+      return
+    }
+    process.nextTick(() => {
+      this.emit('error', new Error('WebSocket was closed before the connection was established'))
+      this.emit('close')
+    })
   }
   // test-side helpers
   open(): void {
+    this.opened = true
     this.emit('open')
   }
   receive(msg: unknown): void {
@@ -448,5 +464,35 @@ describe('NetworkWatcher', () => {
     confirmSubs(s4)
     expect(h.upstream.getLogsCalls).toHaveLength(3)
     expect(h.upstream.getLogsCalls[2].params[0]).toMatchObject({ fromBlock: '0xa1' }) // 160 + 1
+  })
+
+  it('stop() while the socket is still CONNECTING does not crash on the deferred handshake-abort error', async () => {
+    const h = makeHarness()
+    h.watcher.start()
+    const s1 = h.upstream.sockets[0] // never opened — still "CONNECTING"
+    await h.watcher.stop()
+    expect(h.watcher.status).toBe('stopped')
+    // stop() must leave a surviving 'error' listener attached BEFORE close()/terminate() ran
+    // — otherwise the deferred (ws-realistic) handshake-abort error fired on a later tick
+    // would be an unhandled 'error' event on the socket's EventEmitter and crash the process.
+    expect(s1.listenerCount('error')).toBeGreaterThan(0)
+    await flush() // let the deferred handshake-abort error + close actually fire
+    expect(h.watcher.status).toBe('stopped') // nothing crashed; still stopped
+    h.clock.advance(120_000)
+    expect(h.upstream.sockets).toHaveLength(1) // still no reconnect
+  })
+
+  it('reconnect teardown does not crash when the old socket was still CONNECTING (e.g. watchdog-forced terminate mid-handshake)', async () => {
+    const h = makeHarness()
+    h.watcher.start()
+    const s1 = h.upstream.sockets[0] // never opened
+    s1.terminate() // mirrors what #armWatchdog's terminate() call does to a stuck socket
+    await flush() // let the deferred handshake-abort error + close fire
+    // At the moment 'error' fires, #connect()'s original listeners are still attached
+    // (nothing has torn this socket down yet), so it is caught and logged, not unhandled.
+    // #onClose's own removeAllListeners() only runs afterward, on an already-dead socket.
+    expect(h.watcher.status).toBe('degraded') // teardown ran cleanly — no crash
+    h.clock.advance(1000)
+    expect(h.upstream.sockets).toHaveLength(2) // reconnected normally afterward
   })
 })

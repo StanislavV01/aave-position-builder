@@ -130,6 +130,17 @@ export class NetworkWatcher {
     this.#socket = null
     if (socket !== null) {
       socket.removeAllListeners()
+      // A socket still in CONNECTING readyState emits 'error' (ws: "WebSocket was closed
+      // before the connection was established") — asynchronously, on a later tick — when
+      // closed/terminated early, followed by 'close'. removeAllListeners() just stripped
+      // the handler that used to catch that. An 'error' event with zero listeners is not
+      // silently dropped by Node's EventEmitter — it throws, which crashes the process
+      // since nothing here is on the call stack by the time it fires. Re-attach a permanent
+      // sink BEFORE close()/terminate() so that can never happen, no matter how the socket
+      // reacts to being torn down mid-handshake.
+      socket.on('error', () => {
+        this.#deps.log.debug('watcher: socket error swallowed during/after stop()')
+      })
       try {
         socket.close()
       } catch {
