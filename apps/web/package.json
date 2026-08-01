@@ -1,14 +1,28 @@
 {
   "name": "@app/web",
-  "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@app/shared": "workspace:*"
+    "@app/shared": "workspace:*",
+    "@tanstack/react-query": "^5.101.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "viem": "^2.55.10",
+    "wagmi": "2.x"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "tsx": "^4.23.1",
+    "typescript": "~5.9.3",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
   }
 }
