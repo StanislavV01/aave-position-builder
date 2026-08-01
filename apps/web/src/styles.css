@@ -99,7 +99,7 @@ button { font: inherit; }
 }
 .skip-link:focus-visible { top: var(--space-2); }
 @media (prefers-reduced-motion: no-preference) {
-  button, a, input, .select, .asset-row, .chip, .token-icon {
+  button, a, input, .select, .asset-row, .chip, .token-icon, .theme-switch-option {
     transition: border-color var(--transition), background-color var(--transition),
       color var(--transition), opacity var(--transition);
   }
@@ -146,6 +146,21 @@ button { font: inherit; }
   background: var(--select-chevron) no-repeat right var(--space-3) center;
 }
 .select:hover { border-color: var(--accent); }
+
+/* theme switcher: segmented control over native (visually-hidden) radios */
+.theme-switch {
+  display: inline-flex; gap: calc(var(--space-1) / 2); align-items: center;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-full);
+  padding: calc(var(--space-1) / 2); margin: 0;
+}
+.theme-switch-option {
+  padding: calc(var(--space-1) / 2) var(--space-3);
+  border-radius: var(--radius-full); font-size: var(--text-sm);
+  color: var(--text-muted); cursor: pointer; user-select: none;
+}
+.theme-switch-option:hover { color: var(--text); }
+.theme-switch-option:has(input:checked) { background: var(--accent); color: var(--accent-contrast); }
+.theme-switch-option:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 /* ============================================================================
    5. Market list & position tables
