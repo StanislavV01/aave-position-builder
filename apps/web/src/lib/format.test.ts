@@ -5,6 +5,7 @@ import {
   formatTokenAmount,
   formatUsd,
   healthFactorTone,
+  hfGaugePercent,
   hfWadToNumber,
   numberToHfWad,
 } from './format'
@@ -77,5 +78,24 @@ describe('hf slider conversions', () => {
     expect(numberToHfWad(1.5)).toBe(1_500_000_000_000_000_000n)
     expect(numberToHfWad(1.05)).toBe(1_050_000_000_000_000_000n)
     expect(hfWadToNumber(numberToHfWad(2.37))).toBe(2.37)
+  })
+})
+
+describe('hfGaugePercent', () => {
+  it('pins the liquidation boundary and below to 0%', () => {
+    expect(hfGaugePercent(WAD)).toBe(0)
+    expect(hfGaugePercent(WAD / 2n)).toBe(0)
+  })
+
+  it('is linear between 1.0 and 3.0', () => {
+    expect(hfGaugePercent(2n * WAD)).toBe(50)
+    expect(hfGaugePercent(15n * 10n ** 17n)).toBe(25) // 1.5
+    expect(hfGaugePercent(11n * 10n ** 17n)).toBe(5) // 1.1 — danger/warn boundary matches the 5% zone
+  })
+
+  it('pins 3.0+ and the no-debt infinity to 100%', () => {
+    expect(hfGaugePercent(3n * WAD)).toBe(100)
+    expect(hfGaugePercent(1000n * WAD)).toBe(100)
+    expect(hfGaugePercent(MAX_UINT256)).toBe(100)
   })
 })

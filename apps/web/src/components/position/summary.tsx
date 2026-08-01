@@ -1,7 +1,6 @@
 import type { PositionView } from '../../lib/data/derived'
-import { formatApy, formatHealthFactor, formatTokenAmount, formatUsd, healthFactorTone } from '../../lib/format'
-
-const TONE_LABEL = { good: 'healthy', warn: 'caution', danger: 'at risk' } as const
+import { formatApy, formatTokenAmount, formatUsd } from '../../lib/format'
+import { HfGauge } from './hf-gauge'
 
 export function PositionSummary({ view, isLoading }: { view: PositionView | null; isLoading: boolean }) {
   if (isLoading) return <p className="muted">Loading position…</p>
@@ -14,19 +13,19 @@ export function PositionSummary({ view, isLoading }: { view: PositionView | null
       </div>
     )
   }
-  const tone = healthFactorTone(view.account.healthFactorWad)
   return (
     <div>
-      <p>
-        Health factor{' '}
-        <strong className={`tabular hf-${tone}`}>
-          {formatHealthFactor(view.account.healthFactorWad)} · {TONE_LABEL[tone]}
-        </strong>{' '}
-        {view.eModeCategoryId !== 0 ? <span className="badge">eMode: {view.eModeLabel ?? view.eModeCategoryId}</span> : null}
-        {view.account.hasZeroLtvCollateral ? (
-          <span className="badge">some collateral has zero borrowing power</span>
-        ) : null}
-      </p>
+      <HfGauge hfWad={view.account.healthFactorWad} />
+      {view.eModeCategoryId !== 0 || view.account.hasZeroLtvCollateral ? (
+        <p>
+          {view.eModeCategoryId !== 0 ? (
+            <span className="badge">eMode: {view.eModeLabel ?? view.eModeCategoryId}</span>
+          ) : null}{' '}
+          {view.account.hasZeroLtvCollateral ? (
+            <span className="badge">some collateral has zero borrowing power</span>
+          ) : null}
+        </p>
+      ) : null}
       {view.supplied.length > 0 ? (
         <>
           <h3 className="muted">Supplied</h3>

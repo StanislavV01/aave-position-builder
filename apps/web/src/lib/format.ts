@@ -48,6 +48,19 @@ export function healthFactorTone(hfWad: bigint): 'good' | 'warn' | 'danger' {
   return 'danger'
 }
 
+/**
+ * Position of an HF value on the gauge track: linear from 1.0 (liquidation, 0%)
+ * to 3.0 (100%); ∞ and anything above 3.0 pin to 100. Matches the HfSlider range,
+ * so the gauge and the slider tell one consistent spatial story.
+ */
+export function hfGaugePercent(hfWad: bigint): number {
+  const min = WAD
+  const max = 3n * WAD
+  if (hfWad <= min) return 0
+  if (hfWad >= max) return 100
+  return Number(((hfWad - min) * 10_000n) / (max - min)) / 100
+}
+
 /** Slider edge conversions — resolution 0.01, safe well inside double precision. */
 export function hfWadToNumber(hfWad: bigint): number {
   return Number(hfWad / 10n ** 16n) / 100

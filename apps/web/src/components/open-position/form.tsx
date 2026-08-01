@@ -6,9 +6,9 @@ import { ExecutePanel } from './execute-panel'
 import { useOpenPositionPlan } from '../../lib/open-position/plan'
 import { useOpenPosition } from '../../lib/open-position/execute'
 import { shouldMountExecutePanel, visiblePlanReasons } from '../../lib/ui/execute-view'
-import { formatHealthFactor, formatTokenAmount, healthFactorTone } from '../../lib/format'
+import { HfGauge } from '../position/hf-gauge'
+import { formatTokenAmount } from '../../lib/format'
 
-const TONE_LABEL = { good: 'healthy', warn: 'caution', danger: 'at risk' } as const
 const DEFAULT_TARGET_HF = 2n * 10n ** 18n
 
 export function OpenPositionForm({
@@ -132,12 +132,7 @@ export function OpenPositionForm({
       {plan ? (
         <div className="notice">
           {plan.predictedHfWad !== null ? (
-            <p>
-              Health factor after borrow:{' '}
-              <strong className={`tabular hf-${healthFactorTone(plan.predictedHfWad)}`}>
-                {formatHealthFactor(plan.predictedHfWad)} · {TONE_LABEL[healthFactorTone(plan.predictedHfWad)]}
-              </strong>
-            </p>
+            <HfGauge hfWad={plan.predictedHfWad} caption="Health factor after borrow" compact />
           ) : null}
           <p className="muted tabular">
             Max borrow: {formatTokenAmount(plan.maxBorrow, borrowView.decimals)} {borrowView.symbol}

@@ -74,6 +74,24 @@ button { font: inherit; }
 .hf-warn { color: var(--warn); background: var(--warn-bg); border-radius: var(--radius); padding: 0 0.4rem; }
 .hf-danger { color: var(--danger); background: var(--danger-bg); border-radius: var(--radius); padding: 0 0.4rem; }
 
+/* health-factor gauge: hero numeral + linear 1.0→3.0 track, zones = tone thresholds */
+.hf-gauge { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem; }
+.hf-gauge-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.hf-gauge-caption { color: var(--text-muted); font-size: 0.85rem; }
+.hf-gauge-value { font-size: 1.55rem; line-height: 1.25; }
+.hf-gauge-compact .hf-gauge-value { font-size: 1.05rem; }
+.hf-gauge-track { position: relative; height: 8px; border-radius: 999px; overflow: hidden; }
+.hf-gauge-compact .hf-gauge-track { height: 6px; }
+.hf-gauge-zones { display: flex; height: 100%; }
+.hf-zone[data-zone='danger'] { flex: 0 0 5%; background: var(--danger); opacity: 0.45; } /* 1.0–1.1 */
+.hf-zone[data-zone='warn'] { flex: 0 0 45%; background: var(--warn); opacity: 0.45; } /* 1.1–2.0 */
+.hf-zone[data-zone='good'] { flex: 1; background: var(--ok); opacity: 0.45; } /* 2.0–3.0 */
+.hf-gauge-marker {
+  position: absolute; top: 0; bottom: 0; left: var(--gauge-pos, 0%);
+  width: 3px; transform: translateX(-50%); background: var(--text); border-radius: 999px;
+}
+.hf-gauge-scale { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); }
+
 .chips { display: flex; gap: 0.4rem; margin: 0.4rem 0; }
 .chip { border: 1px solid var(--border); background: none; color: inherit; border-radius: 999px; padding: 0.1rem 0.6rem; cursor: pointer; font-size: 0.85rem; }
 .chip:hover { border-color: var(--accent); }
