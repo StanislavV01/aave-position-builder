@@ -6,6 +6,7 @@ import { ConnectCta } from './components/connect-cta'
 import { NetworkSwitcher } from './components/network-switcher'
 import { MarketPanel } from './components/market-panel'
 import { PositionSummary } from './components/position-summary'
+import { OpenPositionForm } from './components/open-position-form'
 import { PoolRevisionNote, StatusChip } from './components/status-chip'
 import { useEModes, useReserveIds, useReservesData, useUserReservesData } from './lib/market-queries'
 import { buildMarketView, buildPositionView } from './lib/derived'
@@ -84,11 +85,11 @@ export function App() {
         <section className="card">
           <h2>Open a position</h2>
           <ConnectCta requiredChainId={chainId}>
-            <p className="muted">
-              {collateralAsset && borrowAsset
-                ? 'Position form lands in the next task.'
-                : 'Pick a collateral asset and a borrow asset in the market panel.'}
-            </p>
+            {collateralAsset && borrowAsset ? (
+              <OpenPositionForm chainId={chainId} collateralAsset={collateralAsset} borrowAsset={borrowAsset} />
+            ) : (
+              <p className="muted">Pick a collateral asset and a borrow asset in the market panel.</p>
+            )}
           </ConnectCta>
         </section>
         <section className="card">
