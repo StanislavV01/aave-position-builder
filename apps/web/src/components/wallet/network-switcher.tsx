@@ -4,7 +4,7 @@ export function NetworkSwitcher({ chainId, onChange }: { chainId: number; onChan
   return (
     <label>
       <span className="visually-hidden">Network</span>
-      <select value={chainId} onChange={(e) => onChange(Number(e.target.value))}>
+      <select className="select" value={chainId} onChange={(e) => onChange(Number(e.target.value))}>
         {MARKETS.map((m) => (
           <option key={m.chainId} value={m.chainId}>
             {m.chainName}
