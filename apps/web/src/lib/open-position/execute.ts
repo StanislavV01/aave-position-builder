@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useState } from 'react'
+import { useCallback, useMemo, useReducer, useRef, useState } from 'react'
 import { BaseError, UserRejectedRequestError, parseSignature, type Address, type Hex } from 'viem'
 import { useConfig } from 'wagmi'
 import { readContract, signTypedData, simulateContract, waitForTransactionReceipt, writeContract } from 'wagmi/actions'
@@ -44,6 +44,14 @@ export type OpenFlowEvent =
   | { type: 'ERROR'; message: string; canRetry: boolean; suggestSequential: boolean }
   | { type: 'RESET' }
 
+// The reducer accepts START only from these phases. The async drivers below check this
+// BEFORE running: dispatch() gives no feedback, so without the check a click that the
+// reducer ignores (e.g. after 'confirmed') would still run the full permit/approve/write
+// flow — wallet popups included — while the UI stays pinned on the old state.
+export function canStartOpenFlow(phase: OpenFlowState['phase']): boolean {
+  return phase === 'idle' || phase === 'error'
+}
+
 export function openFlowReducer(state: OpenFlowState, event: OpenFlowEvent): OpenFlowState {
   switch (event.type) {
     case 'RESET':
@@ -58,7 +66,7 @@ export function openFlowReducer(state: OpenFlowState, event: OpenFlowEvent): Ope
         failedPhase: isInProgressPhase(state.phase) ? state.phase : undefined,
       }
     case 'START':
-      if (state.phase !== 'idle' && state.phase !== 'error') return state
+      if (!canStartOpenFlow(state.phase)) return state
       if (event.permit) return { phase: 'signing-permit' }
       if (event.needsApproval) return { phase: 'approving' }
       return { phase: 'simulating' }
@@ -206,8 +214,14 @@ export function useOpenPosition() {
   const queryClient = useQueryClient()
   const [state, dispatch] = useReducer(openFlowReducer, { phase: 'idle' } as OpenFlowState)
   const [notice, setNotice] = useState<string | null>(null)
+  // Mirror of state.phase readable from the memoized callbacks (their closures would
+  // otherwise see the phase from the render they were created in), plus a synchronous
+  // in-flight lock covering the gap between dispatch(START) and the re-render.
+  const phaseRef = useRef<OpenFlowState['phase']>(state.phase)
+  phaseRef.current = state.phase
+  const runningRef = useRef(false)
 
-  const open = useCallback(
+  const openInner = useCallback(
     async (p: ExecutablePlan) => {
       setNotice(null)
       const chainId = p.market.chainId
@@ -297,7 +311,7 @@ export function useOpenPosition() {
     [config, queryClient],
   )
 
-  const runSequential = useCallback(
+  const runSequentialInner = useCallback(
     async (p: ExecutablePlan) => {
       setNotice(null)
       const chainId = p.market.chainId
@@ -356,6 +370,25 @@ export function useOpenPosition() {
     },
     [config, queryClient],
   )
+
+  // Public entry points: refuse to run when the reducer would refuse START/FALLBACK_START
+  // (see canStartOpenFlow) and hold a synchronous lock so a double-click cannot start a
+  // second driver before the first render lands.
+  const guard = useCallback(
+    (inner: (p: ExecutablePlan) => Promise<void>) =>
+      async (p: ExecutablePlan) => {
+        if (runningRef.current || !canStartOpenFlow(phaseRef.current)) return
+        runningRef.current = true
+        try {
+          await inner(p)
+        } finally {
+          runningRef.current = false
+        }
+      },
+    [],
+  )
+  const open = useMemo(() => guard(openInner), [guard, openInner])
+  const runSequential = useMemo(() => guard(runSequentialInner), [guard, runSequentialInner])
 
   const reset = useCallback(() => {
     setNotice(null)

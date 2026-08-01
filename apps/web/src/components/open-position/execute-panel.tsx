@@ -51,9 +51,15 @@ export function ExecutePanel({ plan, chainId, address }: { plan: OpenPositionPla
 
   return (
     <div>
-      <button className="cta" disabled={busy} onClick={() => void open(executable)}>
-        {busy ? 'Working…' : label}
-      </button>
+      {state.phase === 'confirmed' ? (
+        <button type="button" className="cta" onClick={() => reset()}>
+          Open another position
+        </button>
+      ) : (
+        <button type="button" className="cta" disabled={busy} onClick={() => void open(executable)}>
+          {busy ? 'Working…' : label}
+        </button>
+      )}
       <TxProgress state={state} permitPath={permit !== null} />
       {notice ? <p className="notice">{notice}</p> : null}
       {state.phase === 'error' ? (
@@ -61,6 +67,7 @@ export function ExecutePanel({ plan, chainId, address }: { plan: OpenPositionPla
           <p>{state.message}</p>
           {state.suggestSequential ? (
             <button
+              type="button"
               className="ghost"
               disabled={sequentialStarting}
               onClick={() => {
@@ -72,7 +79,7 @@ export function ExecutePanel({ plan, chainId, address }: { plan: OpenPositionPla
             </button>
           ) : null}
           {state.canRetry ? (
-            <button className="ghost" disabled={sequentialStarting} onClick={() => reset()}>
+            <button type="button" className="ghost" disabled={sequentialStarting} onClick={() => reset()}>
               Dismiss
             </button>
           ) : null}

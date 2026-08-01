@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  canStartOpenFlow,
   ensureReceiptSuccess,
   openFlowReducer,
   runSequentialSteps,
@@ -124,6 +125,30 @@ describe('openFlowReducer — failure and fallback paths', () => {
     const start: OpenFlowEvent = { type: 'START', permit: true, needsApproval: false }
     expect(openFlowReducer({ phase: 'error', message: 'x', canRetry: true, suggestSequential: false }, start)).toEqual({ phase: 'signing-permit' })
     expect(openFlowReducer({ phase: 'pending', txHash: H }, start)).toEqual({ phase: 'pending', txHash: H })
+    // A second click after success must not restart the machine — the driver checks
+    // canStartOpenFlow before running, and the reducer independently refuses.
+    const confirmed: OpenFlowState = { phase: 'confirmed', txHash: H, blockNumber: 1n }
+    expect(openFlowReducer(confirmed, start)).toEqual(confirmed)
+  })
+
+  it('canStartOpenFlow mirrors the reducer START guard for every phase', () => {
+    const cases: [OpenFlowState, boolean][] = [
+      [{ phase: 'idle' }, true],
+      [{ phase: 'error', message: 'x', canRetry: true, suggestSequential: false }, true],
+      [{ phase: 'confirmed', txHash: H, blockNumber: 1n }, false],
+      [{ phase: 'pending', txHash: H }, false],
+      [{ phase: 'signing-permit' }, false],
+      [{ phase: 'approving' }, false],
+      [{ phase: 'simulating' }, false],
+      [{ phase: 'confirm-wallet' }, false],
+      [{ phase: 'fallback-sequential', step: 1, totalSteps: 2 }, false],
+    ]
+    for (const [state, expected] of cases) {
+      expect(canStartOpenFlow(state.phase)).toBe(expected)
+      // consistency: reducer accepts START exactly when canStartOpenFlow says so
+      const after = openFlowReducer(state, { type: 'START', permit: false, needsApproval: false })
+      expect(after !== state).toBe(expected)
+    }
   })
 })
 
