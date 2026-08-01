@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { openFlowReducer, sequentialStepLabels, type OpenFlowEvent, type OpenFlowState } from './execute'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  ensureReceiptSuccess,
+  openFlowReducer,
+  runSequentialSteps,
+  sequentialStepLabels,
+  type OpenFlowEvent,
+  type OpenFlowState,
+  type SequentialTxStep,
+} from './execute'
 
 const H = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as const
 
@@ -105,5 +113,91 @@ describe('openFlowReducer — failure and fallback paths', () => {
     const start: OpenFlowEvent = { type: 'START', permit: true, needsApproval: false }
     expect(openFlowReducer({ phase: 'error', message: 'x', canRetry: true, suggestSequential: false }, start)).toEqual({ phase: 'signing-permit' })
     expect(openFlowReducer({ phase: 'pending', txHash: H }, start)).toEqual({ phase: 'pending', txHash: H })
+  })
+})
+
+describe('ensureReceiptSuccess', () => {
+  it('passes silently for a successful receipt', () => {
+    expect(() => ensureReceiptSuccess({ status: 'success' }, 'approve')).not.toThrow()
+  })
+
+  it('throws with the step label in the message when the receipt mined but reverted', () => {
+    expect(() => ensureReceiptSuccess({ status: 'reverted' }, 'multicall')).toThrow(
+      'multicall transaction reverted on-chain',
+    )
+    expect(() => ensureReceiptSuccess({ status: 'reverted' }, 'approve')).toThrow(
+      'approve transaction reverted on-chain',
+    )
+  })
+})
+
+describe('runSequentialSteps', () => {
+  it('happy path: FALLBACK_START, per-step submit/confirm, then a final TX_CONFIRMED', async () => {
+    const events: OpenFlowEvent[] = []
+    const steps: SequentialTxStep[] = [
+      { label: 'approve', write: async () => H },
+      { label: 'supply', write: async () => H },
+    ]
+    await runSequentialSteps(steps, {
+      waitReceipt: async () => ({ status: 'success', blockNumber: 7n }),
+      dispatch: (e) => events.push(e),
+    })
+    expect(events).toEqual([
+      { type: 'FALLBACK_START', totalSteps: 2 },
+      { type: 'FALLBACK_STEP_SUBMITTED', step: 1, txHash: H },
+      { type: 'FALLBACK_STEP_CONFIRMED', step: 1, totalSteps: 2 },
+      { type: 'FALLBACK_STEP_SUBMITTED', step: 2, txHash: H },
+      { type: 'TX_CONFIRMED', txHash: H, blockNumber: 7n },
+    ])
+  })
+
+  it('stops the loop when a step mines but reverts — later steps are never invoked', async () => {
+    const events: OpenFlowEvent[] = []
+    const step2Write = vi.fn(async () => H)
+    const steps: SequentialTxStep[] = [
+      { label: 'approve', write: async () => H },
+      { label: 'supply', write: step2Write },
+    ]
+    await expect(
+      runSequentialSteps(steps, {
+        waitReceipt: async () => ({ status: 'reverted', blockNumber: 1n }),
+        dispatch: (e) => events.push(e),
+      }),
+    ).rejects.toThrow('approve transaction reverted on-chain')
+
+    expect(step2Write).not.toHaveBeenCalled()
+    expect(events).toEqual([
+      { type: 'FALLBACK_START', totalSteps: 2 },
+      { type: 'FALLBACK_STEP_SUBMITTED', step: 1, txHash: H },
+    ])
+  })
+
+  it('a later step reverting still stops before any subsequent step, with earlier steps already confirmed', async () => {
+    const events: OpenFlowEvent[] = []
+    const step3Write = vi.fn(async () => H)
+    const steps: SequentialTxStep[] = [
+      { label: 'approve', write: async () => H },
+      { label: 'supply', write: async () => H },
+      { label: 'borrow', write: step3Write },
+    ]
+    let call = 0
+    await expect(
+      runSequentialSteps(steps, {
+        waitReceipt: async () => {
+          call += 1
+          // step 1 succeeds, step 2 mines-but-reverts, step 3 must never run
+          return { status: call === 2 ? 'reverted' : 'success', blockNumber: 1n }
+        },
+        dispatch: (e) => events.push(e),
+      }),
+    ).rejects.toThrow('supply transaction reverted on-chain')
+
+    expect(step3Write).not.toHaveBeenCalled()
+    expect(events).toEqual([
+      { type: 'FALLBACK_START', totalSteps: 3 },
+      { type: 'FALLBACK_STEP_SUBMITTED', step: 1, txHash: H },
+      { type: 'FALLBACK_STEP_CONFIRMED', step: 1, totalSteps: 3 },
+      { type: 'FALLBACK_STEP_SUBMITTED', step: 2, txHash: H },
+    ])
   })
 })

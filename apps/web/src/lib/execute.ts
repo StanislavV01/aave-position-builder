@@ -117,12 +117,62 @@ function describeError(err: unknown): string {
   return String(err)
 }
 
+// viem's waitForTransactionReceipt RESOLVES for a transaction that mined but reverted —
+// it only rejects on RPC-level failure (dropped, timeout, etc). Every call site MUST
+// check receipt.status explicitly; a mined-but-reverted tx is not a success.
+export class ReceiptRevertedError extends Error {
+  constructor(public readonly label: string) {
+    super(`${label} transaction reverted on-chain`)
+    this.name = 'ReceiptRevertedError'
+  }
+}
+
+export function ensureReceiptSuccess(receipt: { status: 'success' | 'reverted' }, label: string): void {
+  if (receipt.status !== 'success') {
+    throw new ReceiptRevertedError(label)
+  }
+}
+
 async function invalidateAfterTx(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['userReservesData'] }),
     queryClient.invalidateQueries({ queryKey: ['reservesData'] }),
     queryClient.invalidateQueries({ queryKey: ['tokenState'] }),
   ])
+}
+
+export interface SequentialTxStep {
+  label: string
+  write: () => Promise<Hex>
+}
+
+interface SequentialReceipt {
+  status: 'success' | 'reverted'
+  blockNumber: bigint
+}
+
+// The loop mechanics extracted from runSequential below so they can be unit-tested without
+// a real wagmi config/wallet: write + waitReceipt are injected. A step that mines-but-reverts
+// throws (via ensureReceiptSuccess) and the loop stops — no later step is ever invoked.
+export async function runSequentialSteps(
+  steps: SequentialTxStep[],
+  deps: {
+    waitReceipt: (hash: Hex) => Promise<SequentialReceipt>
+    dispatch: (event: OpenFlowEvent) => void
+  },
+): Promise<void> {
+  deps.dispatch({ type: 'FALLBACK_START', totalSteps: steps.length })
+  for (let i = 0; i < steps.length; i++) {
+    const hash = await steps[i].write()
+    deps.dispatch({ type: 'FALLBACK_STEP_SUBMITTED', step: i + 1, txHash: hash })
+    const receipt = await deps.waitReceipt(hash)
+    ensureReceiptSuccess(receipt, steps[i].label)
+    if (i === steps.length - 1) {
+      deps.dispatch({ type: 'TX_CONFIRMED', txHash: hash, blockNumber: receipt.blockNumber })
+    } else {
+      deps.dispatch({ type: 'FALLBACK_STEP_CONFIRMED', step: i + 1, totalSteps: steps.length })
+    }
+  }
 }
 
 const PERMIT_TYPES = {
@@ -147,6 +197,10 @@ export function useOpenPosition() {
       const chainId = p.market.chainId
       const needsApproval = p.permit === null && p.currentAllowance < p.collateralAmount
       dispatch({ type: 'START', permit: p.permit !== null, needsApproval })
+      // Tracks whether the approve tx actually landed on-chain, so a LATER failure/rejection
+      // (simulation, multicall signature, revert) can invalidate the now-stale allowance and
+      // report an accurate notice instead of implying nothing happened.
+      let approveConfirmed = false
       try {
         let permitSig: { deadline: bigint; v: number; r: Hex; s: Hex } | null = null
         if (p.permit) {
@@ -169,7 +223,9 @@ export function useOpenPosition() {
             args: [p.market.pool, p.collateralAmount],
           })
           dispatch({ type: 'APPROVE_SUBMITTED', txHash: approveHash })
-          await waitForTransactionReceipt(config, { chainId, hash: approveHash })
+          const approveReceipt = await waitForTransactionReceipt(config, { chainId, hash: approveHash })
+          ensureReceiptSuccess(approveReceipt, 'approve')
+          approveConfirmed = true
           dispatch({ type: 'APPROVE_CONFIRMED' })
         }
 
@@ -187,6 +243,7 @@ export function useOpenPosition() {
             functionName: 'multicall', args: [calls],
           })
         } catch (err) {
+          if (approveConfirmed) await invalidateAfterTx(queryClient) // allowance changed — refetch it
           dispatch({ type: 'SIMULATION_FAILED', message: describeError(err) })
           return
         }
@@ -197,15 +254,28 @@ export function useOpenPosition() {
         })
         dispatch({ type: 'TX_SUBMITTED', txHash: hash })
         const receipt = await waitForTransactionReceipt(config, { chainId, hash })
+        ensureReceiptSuccess(receipt, 'multicall')
         dispatch({ type: 'TX_CONFIRMED', txHash: hash, blockNumber: receipt.blockNumber })
         await invalidateAfterTx(queryClient)
       } catch (err) {
+        if (approveConfirmed) {
+          // The approve tx already landed — the allowance changed even though the flow
+          // didn't complete, so the cached tokenState is now stale regardless of why we're here.
+          await invalidateAfterTx(queryClient)
+        }
         if (isUserRejection(err)) {
-          setNotice('Request cancelled in wallet — nothing was sent.')
+          setNotice(
+            approveConfirmed
+              ? 'Approval confirmed, but the position transaction was not sent — you can retry without re-approving.'
+              : 'Request cancelled in wallet — nothing was sent.',
+          )
           dispatch({ type: 'USER_REJECTED' })
           return
         }
-        dispatch({ type: 'ERROR', message: describeError(err), canRetry: true, suggestSequential: false })
+        // A reverted multicall (e.g. price moved between simulation and mining) is the same
+        // class of failure as a failed preflight simulation — offer the sequential fallback.
+        const suggestSequential = err instanceof ReceiptRevertedError && err.label === 'multicall'
+        dispatch({ type: 'ERROR', message: describeError(err), canRetry: true, suggestSequential })
       }
     },
     [config, queryClient],
@@ -215,7 +285,7 @@ export function useOpenPosition() {
     async (p: ExecutablePlan) => {
       setNotice(null)
       const chainId = p.market.chainId
-      const txs: { label: string; write: () => Promise<Hex> }[] = []
+      const txs: SequentialTxStep[] = []
       // The fallback deliberately never uses permit — approve whenever allowance is short,
       // even for permit-capable tokens (keep in sync with sequentialStepLabels above).
       if (p.currentAllowance < p.collateralAmount) {
@@ -252,18 +322,11 @@ export function useOpenPosition() {
         }),
       })
 
-      dispatch({ type: 'FALLBACK_START', totalSteps: txs.length })
       try {
-        for (let i = 0; i < txs.length; i++) {
-          const hash = await txs[i].write()
-          dispatch({ type: 'FALLBACK_STEP_SUBMITTED', step: i + 1, txHash: hash })
-          const receipt = await waitForTransactionReceipt(config, { chainId, hash })
-          if (i === txs.length - 1) {
-            dispatch({ type: 'TX_CONFIRMED', txHash: hash, blockNumber: receipt.blockNumber })
-          } else {
-            dispatch({ type: 'FALLBACK_STEP_CONFIRMED', step: i + 1, totalSteps: txs.length })
-          }
-        }
+        await runSequentialSteps(txs, {
+          waitReceipt: (hash) => waitForTransactionReceipt(config, { chainId, hash }),
+          dispatch,
+        })
         await invalidateAfterTx(queryClient)
       } catch (err) {
         await invalidateAfterTx(queryClient) // earlier steps may have landed — refetch truth
