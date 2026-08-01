@@ -21,7 +21,11 @@ export function ConnectCta({ requiredChainId, children }: { requiredChainId: num
         >
           {connecting ? 'Connecting…' : connector ? 'Connect wallet' : 'No injected wallet found'}
         </button>
-        {connectError ? <p className="reason">{connectError.message}</p> : null}
+        {connectError ? (
+          <div className="error-card" role="alert">
+            {connectError.message}
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -38,7 +42,9 @@ export function ConnectCta({ requiredChainId, children }: { requiredChainId: num
           {switching ? 'Switching…' : `Switch to ${target?.chainName ?? `chain ${requiredChainId}`}`}
         </button>
         {switchError ? (
-          <p className="reason">Switch failed or timed out — switch networks manually in your wallet, the app will follow.</p>
+          <div className="error-card" role="alert">
+            Switch failed or timed out — switch networks manually in your wallet, the app will follow.
+          </div>
         ) : null}
       </div>
     )

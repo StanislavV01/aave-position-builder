@@ -207,7 +207,19 @@ export function useOpenPositionPlan(form: OpenPositionFormInput) {
   const userReserves = useUserReservesData(form.chainId, address)
   const tokenState = useTokenState(form.chainId, address, form.collateralAsset ?? undefined)
 
-  return useMemo(() => {
+  // Error only when there is nothing to plan with — same stale-data-wins rule as the
+  // panes: a failed refetch over existing data keeps the form working.
+  const dataError =
+    (!reserves.data && reserves.isError) ||
+    (!reserveIds.data && reserveIds.isError) ||
+    (!emodes.data && emodes.isError)
+  const refetchMarketData = () => {
+    void reserves.refetch()
+    void reserveIds.refetch()
+    void emodes.refetch()
+  }
+
+  const derived = useMemo(() => {
     if (!reserves.data || !reserveIds.data || !emodes.data) {
       return { plan: null, collateralView: null, borrowView: null, walletBalance: 0n, isLoading: true as const }
     }
@@ -245,4 +257,6 @@ export function useOpenPositionPlan(form: OpenPositionFormInput) {
     form.chainId, form.collateralAsset, form.borrowAsset, form.collateralAmountText,
     form.borrowAmountText, form.lastEdited, form.targetHfWad, form.eModeEnabled,
   ])
+
+  return { ...derived, dataError, refetchMarketData }
 }

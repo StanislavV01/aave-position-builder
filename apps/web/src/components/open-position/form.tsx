@@ -24,11 +24,12 @@ export function OpenPositionForm({
   const [confirmedSummary, setConfirmedSummary] = useState<string | null>(null)
   const flow = useOpenPosition()
 
-  const { plan, collateralView, borrowView, walletBalance, isLoading } = useOpenPositionPlan({
-    chainId, collateralAsset, borrowAsset,
-    collateralAmountText: amountText, borrowAmountText: borrowText,
-    lastEdited, targetHfWad, eModeEnabled,
-  })
+  const { plan, collateralView, borrowView, walletBalance, isLoading, dataError, refetchMarketData } =
+    useOpenPositionPlan({
+      chainId, collateralAsset, borrowAsset,
+      collateralAmountText: amountText, borrowAmountText: borrowText,
+      lastEdited, targetHfWad, eModeEnabled,
+    })
 
   const recommended = plan?.eModeRecommended ?? false
   useEffect(() => {
@@ -54,6 +55,16 @@ export function OpenPositionForm({
     setLastEdited('targetHf')
   }, [phase])
 
+  if (dataError) {
+    return (
+      <div className="error-card" role="alert">
+        Could not load market data.{' '}
+        <button type="button" className="ghost" onClick={refetchMarketData}>
+          Retry
+        </button>
+      </div>
+    )
+  }
   if (isLoading || !collateralView || !borrowView) return <p className="muted">Loading market data…</p>
 
   const borrowDisplay =

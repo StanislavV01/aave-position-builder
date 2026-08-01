@@ -12,6 +12,7 @@ import { PoolRevisionNote, StatusChip } from './components/position/status-chip'
 import { useEModes, useReserveIds, useReservesData, useUserReservesData } from './lib/data/market-queries'
 import { buildMarketView, buildPositionView } from './lib/data/derived'
 import { useLiveUpdates } from './lib/live/updates'
+import { marketPaneState, positionPaneState } from './lib/ui/pane-state'
 
 export function App() {
   const [chainId, setChainId] = useState<number>(baseSepolia.id)
@@ -49,6 +50,22 @@ export function App() {
     setBorrowAsset(null)
   }
 
+  const marketState = marketPaneState([reserves, reserveIds], market !== null)
+  const positionState = positionPaneState(
+    isConnected,
+    [reserves, reserveIds, userReserves, emodes],
+    position !== null,
+  )
+  const retryMarketData = () => {
+    void reserves.refetch()
+    void reserveIds.refetch()
+    void emodes.refetch()
+  }
+  const retryPositionData = () => {
+    retryMarketData()
+    void userReserves.refetch()
+  }
+
   return (
     <div className="layout">
       <header className="topbar">
@@ -66,15 +83,16 @@ export function App() {
       <main className="panes">
         <section className="card">
           <h2>Market</h2>
-          {reserves.isError ? (
-            <div className="error-card">
+          {marketState === 'error' ? (
+            <div className="error-card" role="alert">
               Could not load market data.{' '}
-              <button className="ghost" onClick={() => void reserves.refetch()}>
+              <button type="button" className="ghost" onClick={retryMarketData}>
                 Retry
               </button>
             </div>
-          ) : null}
-          {market ? (
+          ) : marketState === 'loading' ? (
+            <p className="muted">Loading reserves…</p>
+          ) : market ? (
             <MarketPanel
               assets={market}
               selectedSupply={collateralAsset}
@@ -82,8 +100,6 @@ export function App() {
               onSelectSupply={setCollateralAsset}
               onSelectBorrow={setBorrowAsset}
             />
-          ) : reserves.isPending || reserveIds.isPending ? (
-            <p className="muted">Loading reserves…</p>
           ) : null}
         </section>
         <section className="card">
@@ -98,10 +114,16 @@ export function App() {
         </section>
         <section className="card">
           <h2>Your position</h2>
-          <PositionSummary
-            view={isConnected ? position : null}
-            isLoading={isConnected && (userReserves.isPending || !market || emodes.isPending)}
-          />
+          {positionState === 'error' ? (
+            <div className="error-card" role="alert">
+              Could not load your position.{' '}
+              <button type="button" className="ghost" onClick={retryPositionData}>
+                Retry
+              </button>
+            </div>
+          ) : (
+            <PositionSummary view={position} isLoading={positionState === 'loading'} />
+          )}
         </section>
       </main>
       <footer className="statusbar">
