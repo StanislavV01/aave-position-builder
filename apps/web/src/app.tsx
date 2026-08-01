@@ -6,6 +6,7 @@ import { marketByChainId } from '@app/shared'
 import { ConnectCta } from './components/wallet/connect-cta'
 import { NetworkSwitcher } from './components/wallet/network-switcher'
 import { ThemeToggle } from './components/wallet/theme-toggle'
+import { SkeletonLines } from './components/shared/skeleton'
 import { MarketPanel } from './components/market/panel'
 import { PositionSummary } from './components/position/summary'
 import { OpenPositionForm } from './components/open-position/form'
@@ -93,7 +94,7 @@ export function App() {
               </button>
             </div>
           ) : marketState === 'loading' ? (
-            <p className="muted">Loading reserves…</p>
+            <SkeletonLines lines={8} label="Loading reserves" />
           ) : market ? (
             <MarketPanel
               assets={market}

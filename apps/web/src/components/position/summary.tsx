@@ -2,9 +2,10 @@ import type { PositionView } from '../../lib/data/derived'
 import { formatApy, formatTokenAmount, formatUsd } from '../../lib/format'
 import { HfGauge } from './hf-gauge'
 import { TokenIcon } from '../shared/token-icon'
+import { SkeletonLines } from '../shared/skeleton'
 
 export function PositionSummary({ view, isLoading }: { view: PositionView | null; isLoading: boolean }) {
-  if (isLoading) return <p className="muted">Loading position…</p>
+  if (isLoading) return <SkeletonLines lines={5} label="Loading position" />
   if (!view) return <p className="muted">Connect a wallet to see your position.</p>
   if (view.supplied.length === 0 && view.borrowed.length === 0) {
     return (
