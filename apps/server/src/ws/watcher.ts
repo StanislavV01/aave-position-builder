@@ -65,6 +65,7 @@ export class NetworkWatcher {
   #headsSubId: string | null = null
   #watchdogHandle: unknown = null
   #reconnectHandle: unknown = null
+  #repairInFlight = false
   readonly #positionCbs = new Set<(e: PositionEvent) => void>()
   readonly #statusCbs = new Set<(s: WatcherStatus) => void>()
   readonly #poolLogCbs = new Set<(l: PoolLogEvent) => void>()
@@ -158,7 +159,10 @@ export class NetworkWatcher {
   }
 
   #onOpen(): void {
-    this.#reconnectAttempt = 0
+    // NOTE: reconnectAttempt is deliberately NOT reset here. A handshake that succeeds
+    // (open) but closes again before any newHeads arrives is not a healthy connection —
+    // resetting on open would make backoff hammer a flaky upstream at ~base interval
+    // forever. The counter only resets once the socket proves itself live (#onHead).
     const logsId = this.#nextId++
     const headsId = this.#nextId++
     this.#pendingSubs.set(logsId, 'logs')
@@ -208,6 +212,7 @@ export class NetworkWatcher {
   }
 
   #onHead(blockNumber: number): void {
+    this.#reconnectAttempt = 0 // proven live — future disconnects start backoff fresh from base
     this.#lastBlockSeen = blockNumber
     this.#lastBlockAtMs = this.#deps.nowMs()
     this.#setStatus('live')
@@ -232,6 +237,15 @@ export class NetworkWatcher {
   }
 
   async #repairGap(fromBlock: number): Promise<void> {
+    // A prior repair from an earlier reconnect may still be in flight (e.g. rapid
+    // disconnect/reconnect churn while eth_getLogs is slow). Starting a second, overlapping
+    // request for the same/overlapping range would re-emit the same missed PositionEvents.
+    // Skip; the next reconnect after the in-flight one settles will cover any remaining gap.
+    if (this.#repairInFlight) {
+      this.#deps.log.warn({ fromBlock }, 'gap repair already in flight — skipping duplicate request')
+      return
+    }
+    this.#repairInFlight = true
     try {
       const res = await this.#deps.upstream.rpc(this.#deps.market.networkKey, {
         jsonrpc: '2.0',
@@ -254,6 +268,8 @@ export class NetworkWatcher {
     } catch (err) {
       // UpstreamError messages are already sanitized; nothing else is rethrown from upstream.ts
       this.#deps.log.warn({ reason: err instanceof Error ? err.message : 'unknown' }, 'gap repair failed')
+    } finally {
+      this.#repairInFlight = false
     }
   }
 

@@ -66,13 +66,31 @@ class FakeUpstream {
   sockets: FakeSocket[] = []
   getLogsCalls: { network: string; params: unknown[] }[] = []
   getLogsResult: unknown[] = []
+  /** When true, eth_getLogs calls do not resolve until resolvePendingGetLogs() is called —
+   *  lets tests exercise overlapping/in-flight gap-repair races deterministically. */
+  deferGetLogs = false
+  #pendingGetLogs: { id: unknown; resolve: (v: { status: number; body: unknown }) => void }[] = []
   async rpc(network: string, body: unknown): Promise<{ status: number; body: unknown }> {
     const req = body as { id?: unknown; method?: string; params?: unknown[] }
     if (req.method === 'eth_getLogs') {
       this.getLogsCalls.push({ network, params: req.params ?? [] })
+      if (this.deferGetLogs) {
+        return new Promise((resolve) => {
+          this.#pendingGetLogs.push({ id: req.id ?? null, resolve })
+        })
+      }
       return { status: 200, body: { jsonrpc: '2.0', id: req.id ?? null, result: this.getLogsResult } }
     }
     return { status: 200, body: { jsonrpc: '2.0', id: req.id ?? null, result: null } }
+  }
+  /** Resolves the oldest pending deferred eth_getLogs call (FIFO) with the given result. */
+  resolvePendingGetLogs(result: unknown[]): void {
+    const pending = this.#pendingGetLogs.shift()
+    if (pending === undefined) return
+    pending.resolve({ status: 200, body: { jsonrpc: '2.0', id: pending.id, result } })
+  }
+  get pendingGetLogsCount(): number {
+    return this.#pendingGetLogs.length
   }
   openSocket(): FakeSocket {
     const socket = new FakeSocket()
@@ -288,5 +306,90 @@ describe('NetworkWatcher', () => {
     expect(h.watcher.status).toBe('stopped')
     h.clock.advance(120_000)
     expect(h.upstream.sockets).toHaveLength(1)
+  })
+
+  it('a socket error followed by close schedules exactly one reconnect, not two', () => {
+    const h = makeHarness()
+    h.watcher.start()
+    const s1 = h.upstream.sockets[0]
+    s1.emit('error', new Error('ECONNRESET'))
+    s1.emit('close')
+    expect(h.watcher.status).toBe('degraded')
+    h.clock.advance(1000)
+    expect(h.upstream.sockets).toHaveLength(2) // exactly one new socket, not a storm
+    h.clock.advance(1000)
+    expect(h.upstream.sockets).toHaveLength(2) // no further reconnect scheduled by the error itself
+  })
+
+  it('stop() during the backoff wait cancels the pending reconnect', async () => {
+    const h = makeHarness()
+    h.watcher.start()
+    const s1 = h.upstream.sockets[0]
+    s1.emit('close') // schedules a reconnect after the backoff delay
+    expect(h.watcher.status).toBe('degraded')
+    await h.watcher.stop()
+    expect(h.watcher.status).toBe('stopped')
+    h.clock.advance(120_000)
+    expect(h.upstream.sockets).toHaveLength(1) // the scheduled reconnect never fired
+  })
+
+  it('backoff only resets once live (first head), not merely on socket open', () => {
+    const h = makeHarness()
+    h.watcher.start()
+    const s1 = h.upstream.sockets[0]
+    s1.open()
+    confirmSubs(s1)
+    s1.emit('close') // no head ever arrived on s1 — degraded from attempt 0
+    h.clock.advance(1000) // base * 2^0
+    expect(h.upstream.sockets).toHaveLength(2)
+
+    const s2 = h.upstream.sockets[1]
+    s2.open()
+    confirmSubs(s2)
+    s2.emit('close') // still no head — backoff must have escalated despite the open()
+    h.clock.advance(1999)
+    expect(h.upstream.sockets).toHaveLength(2) // would already be 3 here if backoff had wrongly reset to base
+    h.clock.advance(1)
+    expect(h.upstream.sockets).toHaveLength(3) // base * 2^1 = 2000ms confirms escalation held
+
+    const s3 = h.upstream.sockets[2]
+    s3.open()
+    confirmSubs(s3)
+    sendHead(s3, 100) // first head — watcher reaches 'live', backoff resets
+    s3.emit('close')
+    h.clock.advance(999)
+    expect(h.upstream.sockets).toHaveLength(3) // not due yet either way at 999ms
+    h.clock.advance(1)
+    expect(h.upstream.sockets).toHaveLength(4) // back to base * 2^0 = 1000ms — would still be 3 here if backoff had wrongly kept escalating to 4000ms
+  })
+
+  it('overlapping reconnects do not trigger duplicate gap-repair emissions', async () => {
+    const h = makeHarness()
+    h.upstream.deferGetLogs = true
+    h.watcher.start()
+    const s1 = h.upstream.sockets[0]
+    s1.open()
+    confirmSubs(s1)
+    sendHead(s1, 100)
+    s1.emit('close')
+    h.clock.advance(1000)
+
+    const s2 = h.upstream.sockets[1]
+    s2.open() // triggers gap-repair(101) — deferred, stays pending
+    confirmSubs(s2)
+    expect(h.upstream.getLogsCalls).toHaveLength(1)
+    s2.emit('close') // second disconnect while the first repair is still in flight
+    h.clock.advance(2000)
+
+    const s3 = h.upstream.sockets[2]
+    s3.open() // would also want gap-repair(101) — must be SKIPPED, repair already in flight
+    confirmSubs(s3)
+    expect(h.upstream.getLogsCalls).toHaveLength(1) // no second eth_getLogs call fired
+    expect(h.upstream.pendingGetLogsCount).toBe(1)
+
+    h.upstream.resolvePendingGetLogs([supplyLog(101)])
+    await flush()
+    expect(h.events.map((e) => e.event)).toEqual(['Supply']) // emitted exactly once
+    expect(h.events[0].blockNumber).toBe(101)
   })
 })
