@@ -76,14 +76,14 @@ table-tested against Solidity semantics. Would change my mind: an official viem-
 package.
 
 ## 8. HF boundary semantics
-Spec says "hard floor HF > 1.0, warning zone < 1.1" but is silent on HF exactly 1.0 — the
+Design rule: hard floor HF > 1.0, warning zone below 1.1. That leaves HF exactly 1.0 open — the
 protocol's own liquidation trigger is HF < 1.0, not <=.
 Chosen: block HF == 1.0 client-side (`predictedHfWad <= WAD` fails validation) — zero margin is
 liquidated by the next index tick or price move, defeating the point of a target-HF UX. Warning
 zone is `1.0 < HF < 1.1` (`WARN_HF_WAD = 1.1e18`, `plan.ts`).
 Would change my mind: a brief that wants a "maximum leverage" mode.
 
-## 9. Correctness hardening beyond the spec
+## 9. Correctness hardening beyond the requirements
 Three defensive fixes found by tracing edge cases, not by design debate — short form: context →
 what we do → would change my mind (noted once, for all three).
 
@@ -92,16 +92,27 @@ what we do → would change my mind (noted once, for all three).
   `ensureReceiptSuccess(receipt, label)` now gates every wait — single-tx path and each sequential
   fallback step — and a unit test proves the fallback loop stops immediately on a step revert (no
   later `write()` call). Would change my mind: nothing, a correctness bug class, not a preference.
-- **eMode toggle gating.** Spec wants eMode on by default only when it strictly improves the
+- **eMode toggle gating.** Design rule: eMode on by default only when it strictly improves the
   position; nothing enforces that once it's UI state a rendering bug could flip.
   `eModeRecommended = best.ltvBps > collateralView.ltvBps` gates the form default AND is
   re-derived inside the pure `planOpenPosition` core — the same function whose output becomes the
   executed calls — so a form bug can't apply it when it wouldn't strictly help. Would change my
   mind: a tying category that still helps via LT (not observed on either target network).
-- **Watcher resilience.** Three edge cases the spec's reconnect description didn't name: backoff
+- **Watcher resilience.** Three edge cases the original reconnect design didn't name: backoff
   resets only on the first live `newHeads` event, not on socket `open` (else an accept-then-drop
   endpoint gets hammered forever); a failed gap-repair range is retried via a low-water mark
   instead of being silently superseded by a later block; `stop()` mid-handshake attaches a
   permanent error sink before `close()`, since an unlistened `'error'` event on a still-connecting
   socket otherwise crashes the process. Would change my mind: nothing — confirmed against
   `ws`/Node's documented event semantics.
+
+## 10. Constraint model scope: LTV + liquidity only (caps/isolation deferred)
+Max borrow is `min(LTV borrowing power, available liquidity)`, and those are the only two
+constraints the UI names as the binding limit. Aave's remaining borrow-side rules — borrow/supply
+caps, isolation-mode debt ceilings, siloed borrowing — are decoded (`ui-pool-data-provider.ts`
+carries the fields) but deliberately not modeled in the planner. This is a scope cut, not an
+oversight: the preflight simulation still blocks any violating transaction before a wallet prompt,
+at the cost of a raw protocol error instead of a named limit. The honest consequence: on Base
+mainnet, where most reserves carry caps, "Max borrow" can overstate the truly reachable amount
+(simulation still prevents execution). Next step, and what would change the deferral: feed the
+already-decoded cap/ceiling fields into the same binding-constraint enum the UI displays today.
