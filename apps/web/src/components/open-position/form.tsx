@@ -5,7 +5,7 @@ import { HfSlider } from './hf-slider'
 import { ExecutePanel } from './execute-panel'
 import { useOpenPositionPlan } from '../../lib/open-position/plan'
 import { useOpenPosition } from '../../lib/open-position/execute'
-import { shouldMountExecutePanel, visiblePlanReasons } from '../../lib/ui/execute-view'
+import { isFlowInFlight, shouldMountExecutePanel, visiblePlanReasons } from '../../lib/ui/execute-view'
 import { HfGauge } from '../position/hf-gauge'
 import { formatTokenAmount, trimAmountText } from '../../lib/format'
 
@@ -21,7 +21,6 @@ export function OpenPositionForm({
   const [targetHfWad, setTargetHfWad] = useState<bigint>(DEFAULT_TARGET_HF)
   const [eModeEnabled, setEModeEnabled] = useState(false)
   const [eModeTouched, setEModeTouched] = useState(false)
-  const [confirmedSummary, setConfirmedSummary] = useState<string | null>(null)
   const flow = useOpenPosition()
 
   const { plan, collateralView, borrowView, walletBalance, isLoading, dataError, refetchMarketData } =
@@ -36,24 +35,20 @@ export function OpenPositionForm({
     if (!eModeTouched) setEModeEnabled(recommended) // auto-on when eMode strictly improves LTV
   }, [recommended, eModeTouched])
 
-  // On success: snapshot the executed amounts for the confirmation text (the plan loses
-  // them once the inputs clear), then clear the form so the post-success balance refetch
-  // cannot flag the stale amount as "exceeds wallet balance" over the confirmation.
-  // Deliberately keyed on the phase alone — the closure reads the plan of the render the
-  // transition happened in, which still holds the executed amounts.
+  // Clear the form on success so the post-success balance refetch cannot flag the stale
+  // amount as "exceeds wallet balance" over the confirmation. The confirmation's own
+  // "Supplied X, borrowed Y" text is snapshotted by the ExecutePanel at the moment the
+  // driver starts — from the exact executed amounts, not this live plan.
   const phase = flow.state.phase
   useEffect(() => {
     if (phase !== 'confirmed') return
-    if (plan?.collateral && plan.borrow) {
-      setConfirmedSummary(
-        `Supplied ${formatTokenAmount(plan.collateral.amount, plan.collateral.asset.decimals)} ${plan.collateral.asset.symbol}, ` +
-          `borrowed ${formatTokenAmount(plan.borrow.amount, plan.borrow.asset.decimals)} ${plan.borrow.asset.symbol}.`,
-      )
-    }
     setAmountText('')
     setBorrowText('')
     setLastEdited('targetHf')
   }, [phase])
+  // Freeze the inputs while a driver runs: the executed amounts are already locked in,
+  // and a live position-event refetch mid-flow must not re-derive the plan under the user.
+  const flowInFlight = isFlowInFlight(phase)
 
   if (dataError) {
     return (
@@ -68,10 +63,12 @@ export function OpenPositionForm({
   if (isLoading || !collateralView || !borrowView) return <p className="muted">Loading market data…</p>
 
   const borrowDisplay =
-    lastEdited === 'targetHf' && plan?.borrow ? trimAmountText(formatUnits(plan.borrow.amount, borrowView.decimals)) : borrowText
+    lastEdited === 'targetHf' && plan?.borrow && amountText !== ''
+      ? trimAmountText(formatUnits(plan.borrow.amount, borrowView.decimals))
+      : borrowText
   const sliderValueWad =
     lastEdited === 'borrowAmount' && plan?.predictedHfWad ? plan.predictedHfWad : targetHfWad
-  const reasons = plan ? visiblePlanReasons(plan.reasons, amountText !== '' || borrowText !== '') : []
+  const reasons = plan ? visiblePlanReasons(plan.reasons, amountText !== '' || borrowText !== '', flowInFlight) : []
 
   return (
     <form onSubmit={(e) => e.preventDefault()}>
@@ -83,19 +80,23 @@ export function OpenPositionForm({
         <input
           id="collateral-amount" type="text" inputMode="decimal" placeholder="0.0"
           value={amountText} onChange={(e) => setAmountText(e.target.value)}
+          disabled={flowInFlight}
           aria-invalid={reasons.length > 0 || undefined}
           aria-describedby={reasons.length > 0 ? 'plan-errors' : undefined}
         />
         <div className="chips">
           {[25n, 50n, 75n].map((pct) => (
             <button
-              key={pct.toString()} type="button" className="chip"
+              key={pct.toString()} type="button" className="chip" disabled={flowInFlight}
               onClick={() => setAmountText(formatUnits((walletBalance * pct) / 100n, collateralView.decimals))}
             >
               {pct.toString()}%
             </button>
           ))}
-          <button type="button" className="chip" onClick={() => setAmountText(formatUnits(walletBalance, collateralView.decimals))}>
+          <button
+            type="button" className="chip" disabled={flowInFlight}
+            onClick={() => setAmountText(formatUnits(walletBalance, collateralView.decimals))}
+          >
             Max
           </button>
         </div>
@@ -105,7 +106,7 @@ export function OpenPositionForm({
         <div className="field">
           <label>
             <input
-              type="checkbox" checked={eModeEnabled}
+              type="checkbox" checked={eModeEnabled} disabled={flowInFlight}
               onChange={(e) => { setEModeTouched(true); setEModeEnabled(e.target.checked) }}
             />{' '}
             Enable eMode “{plan.eModeCandidate.label}” — LTV {Number(collateralView.ltvBps) / 100}% →{' '}
@@ -122,6 +123,7 @@ export function OpenPositionForm({
         <span>Target health factor</span>
         <HfSlider
           valueWad={sliderValueWad}
+          disabled={flowInFlight}
           onChange={(wad) => { setLastEdited('targetHf'); setTargetHfWad(wad) }}
         />
       </div>
@@ -132,6 +134,7 @@ export function OpenPositionForm({
           id="borrow-amount" type="text" inputMode="decimal" placeholder="0.0"
           value={borrowDisplay}
           onChange={(e) => { setLastEdited('borrowAmount'); setBorrowText(e.target.value) }}
+          disabled={flowInFlight}
           aria-invalid={reasons.length > 0 || undefined}
           aria-describedby={reasons.length > 0 ? 'plan-errors' : undefined}
         />
@@ -167,8 +170,8 @@ export function OpenPositionForm({
         </div>
       ) : null}
 
-      {plan && address && shouldMountExecutePanel(plan.valid, flow.state.phase) ? (
-        <ExecutePanel plan={plan} chainId={chainId} address={address} flow={flow} confirmedSummary={confirmedSummary} />
+      {plan && address && shouldMountExecutePanel(plan.valid, flow.state.phase, flow.notice !== null) ? (
+        <ExecutePanel plan={plan} chainId={chainId} address={address} flow={flow} />
       ) : null}
     </form>
   )

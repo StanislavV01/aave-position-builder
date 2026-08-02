@@ -3,21 +3,14 @@ import type { Address } from 'viem'
 import { marketByChainId } from '@app/shared'
 import type { OpenPositionPlan } from '../../lib/open-position/plan'
 import type { ExecutablePlan, OpenPositionFlow } from '../../lib/open-position/execute'
+import { isFlowInFlight } from '../../lib/ui/execute-view'
 import { usePermitSupport, useTokenState } from '../../lib/data/token-queries'
 import { formatTokenAmount } from '../../lib/format'
 import { TxProgress } from './tx-progress'
 
 export function ExecutePanel({
-  plan, chainId, address, flow, confirmedSummary,
-}: {
-  plan: OpenPositionPlan
-  chainId: number
-  address: Address
-  flow: OpenPositionFlow
-  /** Snapshot of the executed amounts, taken by the form when the flow confirmed —
-   * the live plan no longer has them once the inputs are cleared. */
-  confirmedSummary: string | null
-}) {
+  plan, chainId, address, flow,
+}: { plan: OpenPositionPlan; chainId: number; address: Address; flow: OpenPositionFlow }) {
   const market = marketByChainId(chainId)
   const collateral = plan.collateral
   const borrow = plan.borrow
@@ -30,6 +23,11 @@ export function ExecutePanel({
   // fire a second sequential run or race a Dismiss against it. True for the click-to-dispatch
   // gap only — same busy-style guard as the primary CTA's `disabled={busy}` below.
   const [sequentialStarting, setSequentialStarting] = useState(false)
+  // "Supplied X, borrowed Y" captured at the moment a driver starts, from the exact
+  // amounts handed to it. The live plan keeps re-deriving while the flow runs (and the
+  // inputs are cleared on success), so reading it at confirm time would report amounts
+  // that were never executed.
+  const [executedSummary, setExecutedSummary] = useState<string | null>(null)
 
   if (!market) return null
   // The flow-status UI below must render even when the plan is no longer executable
@@ -55,8 +53,18 @@ export function ExecutePanel({
           currentAllowance: allowance,
         }
       : null
+
+  const startFlow = (runner: (p: ExecutablePlan) => Promise<void>) => {
+    if (!executable || !collateral || !borrow) return
+    setExecutedSummary(
+      `Supplied ${formatTokenAmount(collateral.amount, collateral.asset.decimals)} ${collateral.asset.symbol}, ` +
+        `borrowed ${formatTokenAmount(borrow.amount, borrow.asset.decimals)} ${borrow.asset.symbol}.`,
+    )
+    void runner(executable)
+  }
+
   const needsApproveTx = permit === null && allowance < (collateral?.amount ?? 0n)
-  const busy = state.phase !== 'idle' && state.phase !== 'error' && state.phase !== 'confirmed'
+  const busy = isFlowInFlight(state.phase)
   const explorer = chainId === 8453 ? 'https://basescan.org' : 'https://sepolia.basescan.org'
   const label = permit
     ? 'Sign permit & open position (1 transaction)'
@@ -73,7 +81,7 @@ export function ExecutePanel({
       ) : supportPending ? (
         <p className="muted">Checking token support…</p>
       ) : executable ? (
-        <button type="button" className="cta" disabled={busy} onClick={() => void open(executable)}>
+        <button type="button" className="cta" disabled={busy} onClick={() => startFlow(open)}>
           {busy ? 'Working…' : label}
         </button>
       ) : null}
@@ -98,17 +106,15 @@ export function ExecutePanel({
               disabled={sequentialStarting}
               onClick={() => {
                 setSequentialStarting(true)
-                void runSequential(executable).finally(() => setSequentialStarting(false))
+                startFlow((p) => runSequential(p).finally(() => setSequentialStarting(false)))
               }}
             >
               Try step-by-step instead
             </button>
           ) : null}
-          {state.canRetry ? (
-            <button type="button" className="ghost" disabled={sequentialStarting} onClick={() => reset()}>
-              Dismiss
-            </button>
-          ) : null}
+          <button type="button" className="ghost" disabled={sequentialStarting} onClick={() => reset()}>
+            Dismiss
+          </button>
         </div>
       ) : null}
       {state.phase === 'confirmed' ? (
@@ -117,7 +123,7 @@ export function ExecutePanel({
           <a href={`${explorer}/tx/${state.txHash}`} target="_blank" rel="noreferrer">
             view on Basescan
           </a>
-          .{confirmedSummary ? ` ${confirmedSummary}` : ''}
+          .{executedSummary ? ` ${executedSummary}` : ''}
         </p>
       ) : null}
     </div>
