@@ -14,7 +14,7 @@ import { PoolRevisionNote, StatusChip } from './components/position/status-chip'
 import { useEModes, useReserveIds, useReservesData, useUserReservesData } from './lib/data/market-queries'
 import { buildMarketView, buildPositionView } from './lib/data/derived'
 import { useLiveUpdates } from './lib/live/updates'
-import { marketPaneState, positionPaneState } from './lib/ui/pane-state'
+import { hasStaleError, marketPaneState, positionPaneState } from './lib/ui/pane-state'
 
 export function App() {
   const [chainId, setChainId] = useState<number>(baseSepolia.id)
@@ -53,11 +53,13 @@ export function App() {
   }
 
   const marketState = marketPaneState([reserves, reserveIds], market !== null)
+  const marketStale = hasStaleError([reserves, reserveIds], market !== null)
   const positionState = positionPaneState(
     isConnected,
     [reserves, reserveIds, userReserves, emodes],
     position !== null,
   )
+  const positionStale = hasStaleError([reserves, reserveIds, userReserves, emodes], position !== null)
   const retryMarketData = () => {
     void reserves.refetch()
     void reserveIds.refetch()
@@ -99,13 +101,23 @@ export function App() {
           ) : marketState === 'loading' ? (
             <SkeletonLines lines={8} label="Loading reserves" />
           ) : market ? (
-            <MarketPanel
+            <>
+              {marketStale ? (
+                <p className="tone-banner" data-tone="warn" role="status">
+                  Showing cached data — the last refresh failed.{' '}
+                  <button type="button" className="ghost" onClick={retryMarketData}>
+                    Retry
+                  </button>
+                </p>
+              ) : null}
+              <MarketPanel
               assets={market}
               selectedSupply={collateralAsset}
               selectedBorrow={borrowAsset}
               onSelectSupply={setCollateralAsset}
               onSelectBorrow={setBorrowAsset}
-            />
+              />
+            </>
           ) : null}
         </section>
         <section className="card">
@@ -128,7 +140,17 @@ export function App() {
               </button>
             </div>
           ) : (
-            <PositionSummary view={position} isLoading={positionState === 'loading'} />
+            <>
+              {positionStale ? (
+                <p className="tone-banner" data-tone="warn" role="status">
+                  Showing cached data — the last refresh failed.{' '}
+                  <button type="button" className="ghost" onClick={retryPositionData}>
+                    Retry
+                  </button>
+                </p>
+              ) : null}
+              <PositionSummary view={position} isLoading={positionState === 'loading'} />
+            </>
           )}
         </section>
       </main>

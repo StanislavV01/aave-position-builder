@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { marketPaneState, positionPaneState, type QueryFlags } from './pane-state'
+import { hasStaleError, marketPaneState, positionPaneState, type QueryFlags } from './pane-state'
 
 const ok: QueryFlags = { isError: false, isPending: false }
 const err: QueryFlags = { isError: true, isPending: false }
@@ -39,5 +39,16 @@ describe('positionPaneState', () => {
 
   it('shows the (possibly stale) position even when a refetch errored', () => {
     expect(positionPaneState(true, [err, ok], true)).toBe('ready')
+  })
+})
+
+describe('hasStaleError', () => {
+  it('flags ready-on-cached-data with a failed refresh', () => {
+    expect(hasStaleError([err, ok], true)).toBe(true)
+  })
+
+  it('is quiet when data is fresh or when there is no view (full error state owns that)', () => {
+    expect(hasStaleError([ok, ok], true)).toBe(false)
+    expect(hasStaleError([err, err], false)).toBe(false)
   })
 })

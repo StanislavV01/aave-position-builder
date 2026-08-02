@@ -199,8 +199,14 @@ button { font: inherit; }
 .chip:hover:not(:disabled) { border-color: var(--accent); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: var(--space-2) 0; }
 
-/* tone-chip: the colored value pill (HF readouts, warning banners) */
+/* tone-chip: the colored value pill (inline HF readouts) */
 .tone-chip { color: var(--tone); background: var(--tone-bg); border-radius: var(--radius); padding: 0 var(--space-1); }
+/* tone-banner: the block-level colored message (stale-data hints, liquidation warning) */
+.tone-banner {
+  color: var(--tone); background: var(--tone-bg); border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2); margin: var(--space-2) 0; font-size: var(--text-sm);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+}
 
 .status-chip { gap: var(--space-2); padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
 .status-chip::before { content: '●' / ''; color: var(--tone, var(--text-muted)); }

@@ -208,19 +208,26 @@ export function useOpenPositionPlan(form: OpenPositionFormInput) {
   const tokenState = useTokenState(form.chainId, address, form.collateralAsset ?? undefined)
 
   // Error only when there is nothing to plan with — same stale-data-wins rule as the
-  // panes: a failed refetch over existing data keeps the form working.
+  // panes: a failed refetch over existing data keeps the form working. A connected
+  // user's reserves are part of "something to plan with": planning against a missing
+  // position would silently pretend they have no existing collateral or debt.
   const dataError =
     (!reserves.data && reserves.isError) ||
     (!reserveIds.data && reserveIds.isError) ||
-    (!emodes.data && emodes.isError)
+    (!emodes.data && emodes.isError) ||
+    (address !== undefined && !userReserves.data && userReserves.isError)
   const refetchMarketData = () => {
     void reserves.refetch()
     void reserveIds.refetch()
     void emodes.refetch()
+    void userReserves.refetch()
   }
 
   const derived = useMemo(() => {
-    if (!reserves.data || !reserveIds.data || !emodes.data) {
+    if (
+      !reserves.data || !reserveIds.data || !emodes.data ||
+      (address !== undefined && !userReserves.data)
+    ) {
       return { plan: null, collateralView: null, borrowView: null, walletBalance: 0n, isLoading: true as const }
     }
     const market = buildMarketView(reserves.data.reserves, reserves.data.baseCurrency, reserveIds.data)
@@ -253,7 +260,7 @@ export function useOpenPositionPlan(form: OpenPositionFormInput) {
     })
     return { plan, collateralView, borrowView, walletBalance, isLoading: false as const }
   }, [
-    reserves.data, reserveIds.data, emodes.data, userReserves.data, tokenState.data,
+    reserves.data, reserveIds.data, emodes.data, userReserves.data, tokenState.data, address,
     form.chainId, form.collateralAsset, form.borrowAsset, form.collateralAmountText,
     form.borrowAmountText, form.lastEdited, form.targetHfWad, form.eModeEnabled,
   ])
