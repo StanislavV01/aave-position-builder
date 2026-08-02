@@ -186,7 +186,7 @@ button { font: inherit; }
 .token-icon-fallback {
   display: inline-flex; align-items: center; justify-content: center;
   width: var(--icon-size, 20px); height: var(--icon-size, 20px);
-  background: var(--border); color: var(--text-muted);
+  background: var(--border); color: var(--text);
   font-size: calc(var(--icon-size, 20px) * 0.38); font-weight: 600; text-transform: uppercase;
 }
 
@@ -209,7 +209,9 @@ button { font: inherit; }
 }
 
 .status-chip { gap: var(--space-2); padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
-.status-chip::before { content: '●' / ''; color: var(--tone, var(--text-muted)); }
+/* double content declarations: plain fallback first, then the alt-text form — browsers
+   without slash-alt support drop the second declaration and keep the glyph */
+.status-chip::before { content: '●'; content: '●' / ''; color: var(--tone, var(--text-muted)); }
 
 /* ============================================================================
    7. Form
@@ -224,10 +226,10 @@ button { font: inherit; }
 .slider-row input[type='range'] { flex: 1; }
 
 .steps { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); }
-.step[data-state='done']::before { content: '✓ ' / 'done, '; color: var(--ok); }
-.step[data-state='active']::before { content: '… ' / 'in progress, '; color: var(--warn); }
-.step[data-state='error']::before { content: '✕ ' / 'failed, '; color: var(--danger); }
-.step[data-state='idle']::before { content: '· ' / ''; color: var(--text-muted); }
+.step[data-state='done']::before { content: '✓ '; content: '✓ ' / 'done, '; color: var(--ok); }
+.step[data-state='active']::before { content: '… '; content: '… ' / 'in progress, '; color: var(--warn); }
+.step[data-state='error']::before { content: '✕ '; content: '✕ ' / 'failed, '; color: var(--danger); }
+.step[data-state='idle']::before { content: '· '; content: '· ' / ''; color: var(--text-muted); }
 
 /* ============================================================================
    8. Health-factor gauge: hero numeral + linear 1.0→3.0 track
@@ -244,7 +246,9 @@ button { font: inherit; }
 .hf-zone[data-zone='warn'] { flex: 0 0 45%; background: var(--warn); opacity: 0.45; } /* 1.1–2.0 */
 .hf-zone[data-zone='good'] { flex: 1; background: var(--ok); opacity: 0.45; } /* 2.0–3.0 */
 .hf-gauge-marker {
-  position: absolute; top: 0; bottom: 0; left: var(--gauge-pos, 0%);
+  /* clamp keeps the 3px marker visible at the pinned 0%/100% positions (overflow: hidden
+     on the track would otherwise clip half of it away) */
+  position: absolute; top: 0; bottom: 0; left: clamp(2px, var(--gauge-pos, 0%), calc(100% - 2px));
   width: 3px; transform: translateX(-50%); background: var(--text); border-radius: var(--radius-full);
 }
 .hf-gauge-scale { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-muted); }

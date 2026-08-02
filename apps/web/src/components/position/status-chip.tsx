@@ -25,10 +25,15 @@ export function StatusChip({ status, lastEventAtMs }: { status: ChipStatus; last
   }, [lastEventAtMs])
 
   return (
-    <span className="status-chip" data-tone={STATUS_TONE[status]} role="status">
-      {STATUS_LABEL[status]}
+    <span className="status-chip" data-tone={STATUS_TONE[status]}>
+      {/* Only the label is a live region — the ticking counter sits OUTSIDE it and is
+          aria-hidden, otherwise role=status (implicitly aria-atomic) would re-announce
+          the whole chip every second, drowning out the tx-flow announcements. */}
+      <span role="status">{STATUS_LABEL[status]}</span>
       {lastEventAtMs !== null ? (
-        <span className="muted tabular">· last event {Math.max(0, Math.round((Date.now() - lastEventAtMs) / 1000))}s ago</span>
+        <span className="muted tabular" aria-hidden="true">
+          · last event {Math.max(0, Math.round((Date.now() - lastEventAtMs) / 1000))}s ago
+        </span>
       ) : null}
     </span>
   )

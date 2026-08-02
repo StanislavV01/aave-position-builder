@@ -153,22 +153,27 @@ export function OpenPositionForm({
           </p>
           {plan.capped ? <p className="reason" role="status">Requested amount was capped to the maximum.</p> : null}
           {plan.warnLowHf ? (
-            <p className="tone-chip" data-tone="warn" role="status">
+            <p className="tone-banner" data-tone="warn" role="status">
               Warning: below HF 1.1 a small price move can liquidate this position.
             </p>
           ) : null}
         </div>
       ) : null}
 
-      {reasons.length > 0 ? (
-        <div className="error-card" id="plan-errors" aria-live="polite">
-          <ul>
-            {reasons.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      {/* The live region wrapper is always mounted — a region inserted together with its
+          content is skipped by most screen readers, so the first validation errors would
+          otherwise be silent. */}
+      <div aria-live="polite">
+        {reasons.length > 0 ? (
+          <div className="error-card" id="plan-errors">
+            <ul>
+              {reasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
 
       {plan && address && shouldMountExecutePanel(plan.valid, flow.state.phase, flow.notice !== null) ? (
         <ExecutePanel plan={plan} chainId={chainId} address={address} flow={flow} />
